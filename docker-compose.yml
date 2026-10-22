@@ -1,7 +1,6 @@
 services:
   tailbeacon:
-    build: .
-    image: ghcr.io/shimco/tailbeacon:latest
+    image: tailbeacon:latest
     container_name: tailbeacon
     restart: unless-stopped
     network_mode: host
