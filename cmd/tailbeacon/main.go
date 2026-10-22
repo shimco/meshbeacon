@@ -5,12 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
-	"time"
 
+	"github.com/shimco/tailbeacon/internal/config"
 	"github.com/shimco/tailbeacon/internal/discovery"
 	"github.com/shimco/tailbeacon/internal/proxy"
 )
@@ -24,71 +24,80 @@ func getEnv(key, defaultVal string) string {
 
 func main() {
 	var (
-		upstreamURL   = flag.String("upstream", getEnv("UPSTREAM_URL", "http://mediaserver.horse-pancake.ts.net:8096"), "Upstream Tailscale media server URL")
-		localPort     = flag.Int("port", 8096, "Local port to listen on for proxy traffic")
-		discoveryPort = flag.Int("discovery-port", 7359, "UDP port for Jellyfin discovery broadcast")
-		advertiseAddr = flag.String("advertise-addr", getEnv("ADVERTISE_ADDR", ""), "Local address advertised to clients (e.g., http://192.168.1.50:8096)")
-		serverName    = flag.String("name", getEnv("SERVER_NAME", "Mediaserver"), "Friendly name broadcast to local clients")
-		serverId      = flag.String("id", getEnv("SERVER_ID", "4753126c145c43db84cc5fd0fd164aeb"), "Unique Server ID for Jellyfin clients")
-		enableBeacon  = flag.Bool("beacon", true, "Enable UDP LAN auto-discovery responder")
+		configFile       = flag.String("config", getEnv("CONFIG_FILE", ""), "Path to JSON configuration file")
+		advertiseHost    = flag.String("advertise-host", getEnv("ADVERTISE_HOST", "http://192.168.100.2"), "Local host/IP advertised to LAN clients")
+		upstreamJellyfin = flag.String("jellyfin", getEnv("UPSTREAM_JELLYFIN", "http://mediaserver.horse-pancake.ts.net:8096"), "Upstream Jellyfin URL")
+		upstreamPlex     = flag.String("plex", getEnv("UPSTREAM_PLEX", "http://mediaserver.horse-pancake.ts.net:32400"), "Upstream Plex URL")
 	)
 	flag.Parse()
 
-	log.Println("🗼 Starting Tailbeacon - Local LAN Media Gateway")
-	log.Printf("Upstream Peer:   %s", *upstreamURL)
-	log.Printf("Local HTTP Port: %d", *localPort)
+	log.Println("🗼 Tailbeacon - Local LAN Media Gateway & Autodiscovery")
 
-	// Determine advertisement address if not explicitly passed
-	finalAdvertise := *advertiseAddr
-	if finalAdvertise == "" {
-		finalAdvertise = fmt.Sprintf("http://localhost:%d", *localPort)
+	// 1. Load or Generate Configuration
+	var cfg *config.Config
+	if *configFile != "" {
+		var err error
+		cfg, err = config.LoadConfig(*configFile)
+		if err != nil {
+			log.Fatalf("Failed to load config: %v", err)
+		}
+		log.Printf("Loaded configuration from %s (%d services)", *configFile, len(cfg.Services))
+	} else {
+		cfg = config.DefaultConfig(*advertiseHost, *upstreamJellyfin, *upstreamPlex)
+		log.Printf("Using default configuration for %d services", len(cfg.Services))
 	}
 
-	// 1. Initialize Reverse Proxy
-	rp, err := proxy.NewStreamProxy(*upstreamURL)
+	// 2. Setup Context with Signal Cancellation
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	var wg sync.WaitGroup
+
+	// 3. Start Multi-Service HTTP Streaming Gateway
+	gw, err := proxy.NewGateway(cfg.Services)
 	if err != nil {
-		log.Fatalf("Failed to initialize proxy: %v", err)
+		log.Fatalf("Failed to initialize gateway: %v", err)
 	}
 
-	httpServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", *localPort),
-		Handler: rp,
-	}
-
-	// 2. Start HTTP Proxy in goroutine
+	wg.Add(1)
 	go func() {
-		log.Printf("[Gateway] HTTP proxy listening on :%d", *localPort)
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server failed: %v", err)
+		defer wg.Done()
+		if err := gw.Start(ctx); err != nil {
+			log.Printf("[Gateway Error] %v", err)
 		}
 	}()
 
-	// 3. Initialize & Start Discovery Beacon
-	var beacon *discovery.JellyfinBeacon
-	if *enableBeacon {
-		beacon = discovery.NewJellyfinBeacon(*discoveryPort, finalAdvertise, *serverId, *serverName)
-		if err := beacon.Start(); err != nil {
-			log.Printf("[Warning] Discovery beacon failed to start: %v", err)
+	// 4. Start Discovery Beacons
+	for _, svc := range cfg.Services {
+		var b discovery.Beacon
+
+		switch svc.Discovery.Type {
+		case "jellyfin":
+			targetAddr := fmt.Sprintf("%s:%d", cfg.AdvertiseAddr, svc.LocalPort)
+			b = discovery.NewJellyfinBeacon(svc.Discovery.Port, targetAddr, svc.Discovery.ServerID, svc.Discovery.ServerName)
+
+		case "plex":
+			b = discovery.NewPlexGDMBeacon(svc.Discovery.Port, svc.Discovery.ServerName, svc.LocalPort, svc.Discovery.ServerID)
+
+		default:
+			continue
+		}
+
+		if b != nil {
+			wg.Add(1)
+			go func(beacon discovery.Beacon) {
+				defer wg.Done()
+				if err := beacon.Start(ctx); err != nil {
+					log.Printf("[%s Error] %v", beacon.Name(), err)
+				}
+			}(b)
 		}
 	}
 
-	// 4. Graceful Shutdown on Interrupt
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	<-stop
+	log.Println("🚀 Tailbeacon is live and broadcasting on local network.")
+	<-ctx.Done()
+	log.Println("\n[Shutdown] Signal received, stopping all services...")
 
-	log.Println("\n[Shutdown] Shutting down Tailbeacon gracefully...")
-
-	if beacon != nil {
-		beacon.Stop()
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := httpServer.Shutdown(ctx); err != nil {
-		log.Printf("[Shutdown] Server shutdown error: %v", err)
-	}
-
-	log.Println("[Shutdown] Tailbeacon stopped.")
+	wg.Wait()
+	log.Println("👋 Tailbeacon shutdown complete.")
 }

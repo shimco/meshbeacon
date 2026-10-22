@@ -1,11 +1,12 @@
 package discovery
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -15,8 +16,6 @@ type PlexGDMBeacon struct {
 	serverName string
 	serverPort int
 	resourceId string
-	stopChan   chan struct{}
-	wg         sync.WaitGroup
 }
 
 // NewPlexGDMBeacon creates a new Plex GDM discovery responder.
@@ -26,12 +25,16 @@ func NewPlexGDMBeacon(port int, serverName string, serverPort int, resourceId st
 		serverName: serverName,
 		serverPort: serverPort,
 		resourceId: resourceId,
-		stopChan:   make(chan struct{}),
 	}
 }
 
-// Start begins listening on UDP 32414 for GDM search queries.
-func (b *PlexGDMBeacon) Start() error {
+// Name returns the protocol identifier.
+func (b *PlexGDMBeacon) Name() string {
+	return "Plex GDM Broadcast"
+}
+
+// Start begins listening on UDP port for GDM search queries until ctx is canceled.
+func (b *PlexGDMBeacon) Start(ctx context.Context) error {
 	addr := net.UDPAddr{
 		Port: b.port,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -41,63 +44,55 @@ func (b *PlexGDMBeacon) Start() error {
 	if err != nil {
 		return fmt.Errorf("failed to bind Plex GDM UDP port %d: %w", b.port, err)
 	}
+	defer conn.Close()
 
 	log.Printf("[Plex Beacon] Listening on UDP %d (GDM), advertising '%s' on port %d", b.port, b.serverName, b.serverPort)
 
-	b.wg.Add(1)
-	go func() {
-		defer b.wg.Done()
-		defer conn.Close()
+	buf := make([]byte, 2048)
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("[Plex Beacon] Shutting down...")
+			return nil
+		default:
+		}
 
-		buf := make([]byte, 2048)
-		for {
+		_ = conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		n, remoteAddr, err := conn.ReadFrom(buf)
+		if err != nil {
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				continue
+			}
 			select {
-			case <-b.stopChan:
-				return
+			case <-ctx.Done():
+				return nil
 			default:
-			}
-
-			n, remoteAddr, err := conn.ReadFrom(buf)
-			if err != nil {
-				select {
-				case <-b.stopChan:
-					return
-				default:
-					continue
-				}
-			}
-
-			msg := string(buf[:n])
-			if strings.Contains(msg, "M-SEARCH") {
-				log.Printf("[Plex Beacon] Received GDM discovery probe from %s -> responding", remoteAddr.String())
-
-				resp := fmt.Sprintf(
-					"HTTP/1.0 200 OK\r\n"+
-						"Content-Type: plex/media-server\r\n"+
-						"Name: %s\r\n"+
-						"Port: %d\r\n"+
-						"Resource-Identifier: %s\r\n"+
-						"Version: 1.40.0\r\n"+
-						"Updated-At: %d\r\n\r\n",
-					b.serverName,
-					b.serverPort,
-					b.resourceId,
-					time.Now().Unix(),
-				)
-
-				if _, err := conn.WriteTo([]byte(resp), remoteAddr); err != nil {
-					log.Printf("[Plex Beacon] Write error: %v", err)
-				}
+				continue
 			}
 		}
-	}()
 
-	return nil
-}
+		msg := string(buf[:n])
+		if strings.Contains(msg, "M-SEARCH") {
+			log.Printf("[Plex Beacon] GDM probe from %s -> responding", remoteAddr.String())
 
-// Stop terminates the Plex GDM listener.
-func (b *PlexGDMBeacon) Stop() {
-	close(b.stopChan)
-	b.wg.Wait()
-	log.Printf("[Plex Beacon] Stopped")
+			resp := fmt.Sprintf(
+				"HTTP/1.0 200 OK\r\n"+
+					"Content-Type: plex/media-server\r\n"+
+					"Name: %s\r\n"+
+					"Port: %d\r\n"+
+					"Resource-Identifier: %s\r\n"+
+					"Version: 1.40.0\r\n"+
+					"Updated-At: %d\r\n\r\n",
+				b.serverName,
+				b.serverPort,
+				b.resourceId,
+				time.Now().Unix(),
+			)
+
+			if _, err := conn.WriteTo([]byte(resp), remoteAddr); err != nil {
+				log.Printf("[Plex Beacon] Write error: %v", err)
+			}
+		}
+	}
 }

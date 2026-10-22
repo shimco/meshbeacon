@@ -1,12 +1,14 @@
 package discovery
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"strings"
-	"sync"
+	"time"
 )
 
 // JellyfinServerInfo represents the JSON payload sent in response to Jellyfin discovery probes.
@@ -18,13 +20,11 @@ type JellyfinServerInfo struct {
 
 // JellyfinBeacon handles listening for UDP 7359 broadcast queries.
 type JellyfinBeacon struct {
-	port     int
-	info     JellyfinServerInfo
-	stopChan chan struct{}
-	wg       sync.WaitGroup
+	port int
+	info JellyfinServerInfo
 }
 
-// NewJellyfinBeacon creates a new discovery responder.
+// NewJellyfinBeacon creates a new Jellyfin discovery responder.
 func NewJellyfinBeacon(port int, advertiseAddr, serverId, serverName string) *JellyfinBeacon {
 	return &JellyfinBeacon{
 		port: port,
@@ -33,12 +33,16 @@ func NewJellyfinBeacon(port int, advertiseAddr, serverId, serverName string) *Je
 			Id:      serverId,
 			Name:    serverName,
 		},
-		stopChan: make(chan struct{}),
 	}
 }
 
-// Start begins listening for discovery broadcasts on 0.0.0.0:port.
-func (b *JellyfinBeacon) Start() error {
+// Name returns the protocol identifier.
+func (b *JellyfinBeacon) Name() string {
+	return "Jellyfin UDP Broadcast"
+}
+
+// Start begins listening for discovery broadcasts on 0.0.0.0:port until ctx is canceled.
+func (b *JellyfinBeacon) Start(ctx context.Context) error {
 	addr := net.UDPAddr{
 		Port: b.port,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -46,57 +50,49 @@ func (b *JellyfinBeacon) Start() error {
 
 	conn, err := net.ListenUDP("udp", &addr)
 	if err != nil {
-		return fmt.Errorf("failed to bind UDP port %d: %w", b.port, err)
+		return fmt.Errorf("failed to bind Jellyfin UDP port %d: %w", b.port, err)
 	}
+	defer conn.Close()
 
 	payload, err := json.Marshal(b.info)
 	if err != nil {
-		_ = conn.Close()
 		return fmt.Errorf("failed to marshal server info: %w", err)
 	}
 
 	log.Printf("[Jellyfin Beacon] Listening on UDP %d, advertising %s (%s)", b.port, b.info.Address, b.info.Name)
 
-	b.wg.Add(1)
-	go func() {
-		defer b.wg.Done()
-		defer conn.Close()
+	buf := make([]byte, 1024)
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("[Jellyfin Beacon] Shutting down...")
+			return nil
+		default:
+		}
 
-		buf := make([]byte, 1024)
-		for {
+		// Set read deadline so socket doesn't block forever, allowing clean context checks
+		_ = conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		n, remoteAddr, err := conn.ReadFrom(buf)
+		if err != nil {
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				continue
+			}
 			select {
-			case <-b.stopChan:
-				return
+			case <-ctx.Done():
+				return nil
 			default:
-			}
-
-			n, remoteAddr, err := conn.ReadFrom(buf)
-			if err != nil {
-				select {
-				case <-b.stopChan:
-					return
-				default:
-					log.Printf("[Jellyfin Beacon] Read error: %v", err)
-					continue
-				}
-			}
-
-			msg := string(buf[:n])
-			if strings.Contains(msg, "Who is JellyfinServer?") {
-				log.Printf("[Jellyfin Beacon] Received discovery probe from %s -> responding", remoteAddr.String())
-				if _, err := conn.WriteTo(payload, remoteAddr); err != nil {
-					log.Printf("[Jellyfin Beacon] Write error: %v", err)
-				}
+				log.Printf("[Jellyfin Beacon] Read error: %v", err)
+				continue
 			}
 		}
-	}()
 
-	return nil
-}
-
-// Stop terminates the UDP listener.
-func (b *JellyfinBeacon) Stop() {
-	close(b.stopChan)
-	b.wg.Wait()
-	log.Printf("[Jellyfin Beacon] Stopped")
+		msg := string(buf[:n])
+		if strings.Contains(msg, "Who is JellyfinServer?") {
+			log.Printf("[Jellyfin Beacon] Probe from %s -> replying with %s", remoteAddr.String(), b.info.Address)
+			if _, err := conn.WriteTo(payload, remoteAddr); err != nil {
+				log.Printf("[Jellyfin Beacon] Write error: %v", err)
+			}
+		}
+	}
 }
