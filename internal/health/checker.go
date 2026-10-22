@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/shimco/tailbeacon/internal/config"
+	"github.com/shimco/meshbeacon/internal/config"
 )
 
 // CheckService performs TCP and upstream reachability checks for a configured service.

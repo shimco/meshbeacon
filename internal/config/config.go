@@ -19,7 +19,7 @@ type ServiceConfig struct {
 	} `json:"discovery"`
 }
 
-// Config represents the complete Tailbeacon runtime configuration.
+// Config represents the complete Meshbeacon runtime configuration.
 type Config struct {
 	AdvertiseAddr string          `json:"advertise_addr"` // e.g. "http://192.168.1.100" or "auto"
 	Services      []ServiceConfig `json:"services"`

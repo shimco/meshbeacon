@@ -85,7 +85,7 @@ func NewStreamProxy(name, targetURL string) (*StreamProxy, error) {
 
 	rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		log.Printf("[Proxy Error][%s] %s %s: %v", name, r.Method, r.URL.Path, err)
-		http.Error(w, "Tailbeacon Gateway Error: Upstream service unavailable", http.StatusBadGateway)
+		http.Error(w, "Meshbeacon Gateway Error: Upstream service unavailable", http.StatusBadGateway)
 	}
 
 	return &StreamProxy{

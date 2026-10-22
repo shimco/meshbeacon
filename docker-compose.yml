@@ -1,9 +1,10 @@
 services:
-  tailbeacon:
-    image: tailbeacon:latest
-    container_name: tailbeacon
+  meshbeacon:
+    build: .
+    image: ghcr.io/shimco/meshbeacon:latest
+    container_name: meshbeacon
     restart: unless-stopped
     network_mode: host
-    command: ["-config", "/etc/tailbeacon/tailbeacon.json"]
+    command: ["-config", "/etc/meshbeacon/meshbeacon.json"]
     volumes:
-      - ./tailbeacon.json:/etc/tailbeacon/tailbeacon.json:ro
+      - ./meshbeacon.json:/etc/meshbeacon/meshbeacon.json:ro

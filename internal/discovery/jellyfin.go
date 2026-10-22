@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shimco/tailbeacon/internal/netutil"
+	"github.com/shimco/meshbeacon/internal/netutil"
 )
 
 // jellyfinPayload is the JSON payload sent in response to and in active broadcasts for Jellyfin discovery.

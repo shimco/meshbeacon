@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shimco/tailbeacon/internal/config"
+	"github.com/shimco/meshbeacon/internal/config"
 )
 
 // Gateway manages a collection of concurrent reverse proxies across multiple ports.

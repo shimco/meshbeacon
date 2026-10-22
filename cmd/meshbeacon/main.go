@@ -11,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shimco/tailbeacon/internal/config"
-	"github.com/shimco/tailbeacon/internal/discovery"
-	"github.com/shimco/tailbeacon/internal/health"
-	"github.com/shimco/tailbeacon/internal/netutil"
-	"github.com/shimco/tailbeacon/internal/proxy"
+	"github.com/shimco/meshbeacon/internal/config"
+	"github.com/shimco/meshbeacon/internal/discovery"
+	"github.com/shimco/meshbeacon/internal/health"
+	"github.com/shimco/meshbeacon/internal/netutil"
+	"github.com/shimco/meshbeacon/internal/proxy"
 )
 
 func getEnv(key, defaultVal string) string {
@@ -68,7 +68,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	log.Println("🗼 Tailbeacon - Local LAN Media Gateway & Autodiscovery")
+	log.Println("🗼 Meshbeacon - Local LAN Media Gateway & Autodiscovery")
 	log.Printf("Advertising LAN Host: %s (%d services configured)", cfg.AdvertiseAddr, len(cfg.Services))
 
 	// 4. Setup Context with Signal Cancellation
@@ -164,10 +164,10 @@ func main() {
 		}
 	}
 
-	log.Println("🚀 Tailbeacon is live, proxying streams and broadcasting on LAN.")
+	log.Println("🚀 Meshbeacon is live, proxying streams and broadcasting on LAN.")
 	<-ctx.Done()
 	log.Println("\n[Shutdown] Signal received, stopping all services...")
 
 	wg.Wait()
-	log.Println("👋 Tailbeacon shutdown complete.")
+	log.Println("👋 Meshbeacon shutdown complete.")
 }

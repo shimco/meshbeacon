@@ -1,3 +1,15 @@
-module github.com/shimco/tailbeacon
+module github.com/shimco/meshbeacon
 
-go 1.24
+go 1.24.0
+
+require github.com/grandcat/zeroconf v1.0.0
+
+require (
+	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
+	github.com/miekg/dns v1.1.27 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
+	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa // indirect
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58 // indirect
+	golang.org/x/sys v0.0.0-20190924154521-2837fb4f24fe // indirect
+)
