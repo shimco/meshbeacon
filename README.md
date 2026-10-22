@@ -67,10 +67,15 @@ Tailbeacon bridges your remote Tailscale media server into your local home Wi-Fi
 
 - [x] **Jellyfin LAN Discovery:** Listens for broadcast probes (`Who is JellyfinServer?`) on UDP port `7359` and announces the local gateway.
 - [x] **mDNS / DNS-SD Broadcasting:** Publishes `_jellyfin._tcp` zero-conf records for Swiftfin, Infuse, and modern TV clients.
+- [x] **Universal Cross-Platform Binaries:** Pure Go (`CGO_ENABLED=0`) builds with zero external libc/musl runtime dependencies:
+  - 📡 **OpenWrt & Travel Routers:** AArch64 (MediaTek Filogic, GL-MT6000), ARMv7 (GL-MT3000), MIPS/MIPSEL.
+  - 🥧 **ARM Single-Board Computers:** Raspberry Pi Zero 2W / 3 / 4 / 5, Orange Pi, Rockchip RK3588.
+  - ⚡ **Next-Gen RISC-V:** Native `linux/riscv64` (VisionFive 2, Milk-V, SpacemiT).
+  - 💻 **x86_64:** Intel N100 mini-PCs, Proxmox, TrueNAS, unRAID, OPNsense/pfSense.
+- [ ] **OpenWrt Native Service:** Lightweight `/etc/init.d/tailbeacon` procd service + UCI configuration (<4MB binary with UPX).
 - [ ] **Plex GDM Relay:** Relays Plex "Good Day Mate" discovery packets across subnets.
 - [ ] **Embedded Web GUI:** Modern, dark-mode configuration dashboard to toggle services, view active stream bitrates, and manage upstream routes.
 - [ ] **Local Asset Caching:** Caches movie posters, episode thumbnails, and UI backdrops in local RAM/SSD to eliminate WAN round-trip latency on international links.
-- [ ] **Single Binary & Container:** Ships as a statically compiled Go binary (~15MB, <10MB RAM) and multi-arch Docker image (`amd64`, `arm64`, `armv7`).
 
 ---
 
