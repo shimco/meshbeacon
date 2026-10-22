@@ -66,16 +66,26 @@ Tailbeacon bridges your remote Tailscale media server into your local home Wi-Fi
 ## ✨ Features
 
 - [x] **Jellyfin LAN Discovery:** Listens for broadcast probes (`Who is JellyfinServer?`) on UDP port `7359` and announces the local gateway.
-- [x] **mDNS / DNS-SD Broadcasting:** Publishes `_jellyfin._tcp` zero-conf records for Swiftfin, Infuse, and modern TV clients.
+- [x] **Plex GDM Discovery:** Responds to Plex "Good Day Mate" UDP discovery queries on port `32414`.
+- [x] **mDNS / DNS-SD Broadcasting:** Publishes `_jellyfin._tcp` and `_plexmediasvr._tcp` zero-conf records for Apple TV (Swiftfin), Infuse, and iOS clients.
+- [x] **Zero-Config Identity Auto-Detection:** Automatically queries upstream server endpoints (`/System/Info/Public` and `/identity`) to fetch Server IDs and names—no manual UUID configuration needed.
+- [x] **Zero-Allocation Stream Proxy:** Hardened Go reverse proxy with pooled 32KB buffers (`sync.Pool`) for high-bitrate 4K streaming with minimal RAM usage.
+- [x] **Docker Healthcheck & Self-Healing:** Built-in `-health-check` CLI verifying local proxy sockets and upstream reachability for Docker autoheal and Watchtower.
 - [x] **Universal Cross-Platform Binaries:** Pure Go (`CGO_ENABLED=0`) builds with zero external libc/musl runtime dependencies:
   - 📡 **OpenWrt & Travel Routers:** AArch64 (MediaTek Filogic, GL-MT6000), ARMv7 (GL-MT3000), MIPS/MIPSEL.
   - 🥧 **ARM Single-Board Computers:** Raspberry Pi Zero 2W / 3 / 4 / 5, Orange Pi, Rockchip RK3588.
   - ⚡ **Next-Gen RISC-V:** Native `linux/riscv64` (VisionFive 2, Milk-V, SpacemiT).
   - 💻 **x86_64:** Intel N100 mini-PCs, Proxmox, TrueNAS, unRAID, OPNsense/pfSense.
 - [ ] **OpenWrt Native Service:** Lightweight `/etc/init.d/tailbeacon` procd service + UCI configuration (<4MB binary with UPX).
-- [ ] **Plex GDM Relay:** Relays Plex "Good Day Mate" discovery packets across subnets.
 - [ ] **Embedded Web GUI:** Modern, dark-mode configuration dashboard to toggle services, view active stream bitrates, and manage upstream routes.
 - [ ] **Local Asset Caching:** Caches movie posters, episode thumbnails, and UI backdrops in local RAM/SSD to eliminate WAN round-trip latency on international links.
+
+---
+
+## 📋 Prerequisites
+
+1. A device on your local home network to run Tailbeacon (Raspberry Pi, home server, mini-PC, NAS, or OpenWrt router).
+2. **Tailscale running on that host machine** (or accessible via a local subnet router). Tailbeacon bridges the host's existing Tailscale connection into the unencrypted local LAN.
 
 ---
 
@@ -83,33 +93,41 @@ Tailbeacon bridges your remote Tailscale media server into your local home Wi-Fi
 
 ### Option A: Docker Compose (Recommended)
 
+> [!NOTE]
+> `network_mode: host` is **required** so Tailbeacon can bind and broadcast directly on the physical LAN's UDP discovery ports (`7359`, `32414`, `5353`).
+
 1. Copy the example configuration:
    ```bash
    cp tailbeacon.example.json tailbeacon.json
    ```
-2. Edit `tailbeacon.json` with your upstream Tailscale URLs (e.g. `http://mediaserver.your-tailnet.ts.net:8096`).
-3. Run with `docker-compose.yml`:
-   ```yaml
-   services:
-     tailbeacon:
-       image: ghcr.io/shimco/tailbeacon:latest
-       container_name: tailbeacon
-       restart: unless-stopped
-       network_mode: host
-       command: ["-config", "/etc/tailbeacon/tailbeacon.json"]
-       volumes:
-         - ./tailbeacon.json:/etc/tailbeacon/tailbeacon.json:ro
+2. Edit `tailbeacon.json` with your upstream Tailscale URLs (e.g. `http://mediaserver.your-tailnet.ts.net:8096`). Server IDs and names are auto-detected automatically if left blank:
+   ```json
+   {
+     "advertise_addr": "auto",
+     "services": [
+       {
+         "name": "jellyfin",
+         "local_port": 8096,
+         "upstream_url": "http://mediaserver.your-tailnet.ts.net:8096",
+         "discovery": {
+           "type": "jellyfin",
+           "port": 7359
+         }
+       }
+     ]
+   }
    ```
+3. Run with `docker compose`:
    ```bash
    docker compose up -d
    ```
 
 ### Option B: Standalone Binary (Raspberry Pi / Linux / OpenWrt)
 
-Run directly using flags or environment variables (server IDs and names are automatically discovered from the upstream servers):
+Run directly using CLI flags or environment variables:
 
 ```bash
-# Using CLI flags
+# Using CLI flags (Server IDs and names are automatically fetched from upstream)
 tailbeacon -jellyfin http://mediaserver.your-tailnet.ts.net:8096 -plex http://mediaserver.your-tailnet.ts.net:32400
 
 # Or via environment variables
@@ -117,6 +135,18 @@ export UPSTREAM_JELLYFIN="http://mediaserver.your-tailnet.ts.net:8096"
 export UPSTREAM_PLEX="http://mediaserver.your-tailnet.ts.net:32400"
 tailbeacon
 ```
+
+---
+
+## 💡 Smart TV Tips & Troubleshooting
+
+* **Google TV / Android TV / Fire TV:**
+  - On first launch, open the Jellyfin app to the server selection screen. Tailbeacon sends active broadcasts every 30s (with fast bursts on startup) to populate the server automatically.
+* **Apple TV (Swiftfin) & iOS:**
+  - tvOS and iOS require local network permission. Ensure **Settings → Apps → Swiftfin → Local Network** is toggled **ON**.
+* **Wi-Fi Multicast / AP Isolation:**
+  - If your TV is on Wi-Fi and Tailbeacon is on Ethernet, verify that **"Wireless Multicast Forwarding (WMF)"** or **"IGMP Snooping"** is enabled in your router settings, and **"AP Isolation"** is disabled.
+  - If discovery is blocked by an aggressive router, entering `http://<tailbeacon-lan-ip>:8096` directly into the TV app always connects immediately through the streaming proxy.
 
 ---
 
