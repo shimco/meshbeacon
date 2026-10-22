@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -119,6 +120,10 @@ func (b *JellyfinBeacon) Start(ctx context.Context) error {
 				log.Printf("[Jellyfin Beacon] Read error: %v", err)
 				continue
 			}
+		}
+
+		if bytes.Equal(buf[:n], b.payload) {
+			continue // suppress self broadcast loopback
 		}
 
 		msg := strings.TrimSpace(string(buf[:n]))
