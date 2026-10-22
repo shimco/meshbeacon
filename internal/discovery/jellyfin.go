@@ -9,6 +9,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/shimco/tailbeacon/internal/netutil"
 )
 
 // jellyfinPayload is the JSON payload sent in response to and in active broadcasts for Jellyfin discovery.
@@ -21,8 +23,8 @@ type jellyfinPayload struct {
 }
 
 // JellyfinBeacon implements two-way Jellyfin UDP discovery on port 7359:
-//  1. Passive: listens for "Who is JellyfinServer?" broadcasts and replies.
-//  2. Active: periodically broadcasts server presence to 255.255.255.255:7359,
+//  1. Passive: listens for "Who is JellyfinServer?" broadcasts (case-insensitive) and replies.
+//  2. Active: periodically broadcasts server presence to all subnet broadcast addresses,
 //     matching the real Jellyfin server's behavior so TVs find it without initiating a probe.
 type JellyfinBeacon struct {
 	port            int
@@ -49,7 +51,7 @@ func NewJellyfinBeacon(port int, advertiseAddr, serverId, serverName string) *Je
 	return &JellyfinBeacon{
 		port:            port,
 		payload:         payload,
-		broadcastPeriod: 30 * time.Second,
+		broadcastPeriod: 10 * time.Second,
 	}
 }
 
@@ -71,22 +73,15 @@ func (b *JellyfinBeacon) Start(ctx context.Context) error {
 	}
 	defer conn.Close()
 
-	// Enable SO_BROADCAST so we can send to 255.255.255.255
 	if err := conn.SetWriteBuffer(65536); err != nil {
 		log.Printf("[Jellyfin Beacon] Warning: could not set write buffer: %v", err)
-	}
-
-	broadcastAddr := &net.UDPAddr{
-		IP:   net.IPv4bcast,
-		Port: b.port,
 	}
 
 	log.Printf("[Jellyfin Beacon] Listening on UDP %d (passive + active broadcast every %s)", b.port, b.broadcastPeriod)
 
 	// Active broadcaster goroutine
 	go func() {
-		// Broadcast immediately on startup so TVs that are already on the screen see it
-		b.broadcast(conn, broadcastAddr)
+		b.broadcastAll(conn)
 
 		ticker := time.NewTicker(b.broadcastPeriod)
 		defer ticker.Stop()
@@ -95,7 +90,7 @@ func (b *JellyfinBeacon) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				b.broadcast(conn, broadcastAddr)
+				b.broadcastAll(conn)
 			}
 		}
 	}()
@@ -127,19 +122,27 @@ func (b *JellyfinBeacon) Start(ctx context.Context) error {
 		}
 
 		msg := strings.TrimSpace(string(buf[:n]))
-		if strings.Contains(msg, "Who is JellyfinServer?") {
-			log.Printf("[Jellyfin Beacon] Probe from %s -> replying", remoteAddr.String())
+		log.Printf("[Jellyfin Beacon] Packet (%d bytes) from %s: %q", n, remoteAddr.String(), msg)
+
+		// Check for probe variations ("Who is JellyfinServer?", "who is JellyfinServer?", etc.)
+		if strings.Contains(strings.ToLower(msg), "who is jellyfinserver") {
+			log.Printf("[Jellyfin Beacon] Probe detected from %s -> sending server payload", remoteAddr.String())
 			if _, err := conn.WriteTo(b.payload, remoteAddr); err != nil {
-				log.Printf("[Jellyfin Beacon] Reply error: %v", err)
+				log.Printf("[Jellyfin Beacon] Reply error to %s: %v", remoteAddr.String(), err)
 			}
 		}
 	}
 }
 
-func (b *JellyfinBeacon) broadcast(conn *net.UDPConn, addr *net.UDPAddr) {
-	if _, err := conn.WriteTo(b.payload, addr); err != nil {
-		log.Printf("[Jellyfin Beacon] Broadcast error: %v", err)
-	} else {
-		log.Printf("[Jellyfin Beacon] Broadcast -> %s", addr.String())
+func (b *JellyfinBeacon) broadcastAll(conn *net.UDPConn) {
+	bcastIPs := netutil.GetBroadcastAddresses()
+	for _, ip := range bcastIPs {
+		addr := &net.UDPAddr{
+			IP:   ip,
+			Port: b.port,
+		}
+		if _, err := conn.WriteTo(b.payload, addr); err != nil {
+			log.Printf("[Jellyfin Beacon] Broadcast error to %s: %v", addr.String(), err)
+		}
 	}
 }

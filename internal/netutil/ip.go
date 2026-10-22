@@ -68,3 +68,42 @@ func NormalizeHost(host string) (string, error) {
 	}
 	return trimmed, nil
 }
+
+// GetBroadcastAddresses returns 255.255.255.255 plus all calculated subnet broadcast addresses for active IPv4 interfaces.
+func GetBroadcastAddresses() []net.IP {
+	var list []net.IP
+	list = append(list, net.IPv4bcast)
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return list
+	}
+
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagBroadcast == 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			ipNet, ok := addr.(*net.IPNet)
+			if !ok || ipNet.IP.To4() == nil || ipNet.IP.IsLoopback() {
+				continue
+			}
+			ip := ipNet.IP.To4()
+			mask := ipNet.Mask
+			if len(mask) == 4 {
+				bcast := net.IPv4(
+					ip[0]|^mask[0],
+					ip[1]|^mask[1],
+					ip[2]|^mask[2],
+					ip[3]|^mask[3],
+				)
+				list = append(list, bcast)
+			}
+		}
+	}
+	return list
+}
