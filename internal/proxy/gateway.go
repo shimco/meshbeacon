@@ -15,6 +15,7 @@ import (
 type Gateway struct {
 	services []config.ServiceConfig
 	servers  []*http.Server
+	proxies  []*StreamProxy
 }
 
 // NewGateway creates a gateway from service configs.
@@ -22,10 +23,11 @@ func NewGateway(services []config.ServiceConfig) (*Gateway, error) {
 	gw := &Gateway{
 		services: services,
 		servers:  make([]*http.Server, 0, len(services)),
+		proxies:  make([]*StreamProxy, 0, len(services)),
 	}
 
 	for _, svc := range services {
-		rp, err := NewStreamProxy(svc.UpstreamURL)
+		rp, err := NewStreamProxy(svc.Name, svc.UpstreamURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize proxy for %s (%s): %w", svc.Name, svc.UpstreamURL, err)
 		}
@@ -35,6 +37,7 @@ func NewGateway(services []config.ServiceConfig) (*Gateway, error) {
 			Handler: rp,
 		}
 		gw.servers = append(gw.servers, server)
+		gw.proxies = append(gw.proxies, rp)
 	}
 
 	return gw, nil

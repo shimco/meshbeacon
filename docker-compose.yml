@@ -5,8 +5,6 @@ services:
     container_name: tailbeacon
     restart: unless-stopped
     network_mode: host
-    environment:
-      - UPSTREAM_URL=http://mediaserver.horse-pancake.ts.net:8096
-      - ADVERTISE_ADDR=http://192.168.100.2:8096
-      - SERVER_NAME=Mediaserver
-      - SERVER_ID=4753126c145c43db84cc5fd0fd164aeb
+    command: ["-config", "/etc/tailbeacon/tailbeacon.json"]
+    volumes:
+      - ./tailbeacon.json:/etc/tailbeacon/tailbeacon.json:ro

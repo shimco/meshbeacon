@@ -69,7 +69,7 @@ func DefaultConfig(advertiseHost string, upstreamJellyfin string, upstreamPlex s
 		sc.Discovery.Type = "plex"
 		sc.Discovery.Port = 32414
 		sc.Discovery.ServerName = "Mediaserver (Plex)"
-		sc.Discovery.ServerID = "fa479deba93ac5f46d06171dc5ffbba6c1917218"
+		sc.Discovery.ServerID = "2236bede71a9d13c4ff5896a51865d5d9c37a3e5"
 		cfg.Services = append(cfg.Services, sc)
 	}
 

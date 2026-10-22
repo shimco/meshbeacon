@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "advertise_addr": "auto",
+  "services": [
+    {
+      "name": "jellyfin",
+      "local_port": 8096,
+      "upstream_url": "http://mediaserver.horse-pancake.ts.net:8096",
+      "discovery": {
+        "type": "jellyfin",
+        "port": 7359,
+        "server_name": "Mediaserver",
+        "server_id": "4753126c145c43db84cc5fd0fd164aeb"
+      }
+    },
+    {
+      "name": "plex",
+      "local_port": 32400,
+      "upstream_url": "http://mediaserver.horse-pancake.ts.net:32400",
+      "discovery": {
+        "type": "plex",
+        "port": 32414,
+        "server_name": "Mediaserver (Plex)",
+        "server_id": "2236bede71a9d13c4ff5896a51865d5d9c37a3e5"
+      }
+    }
+  ]
+}

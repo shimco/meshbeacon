@@ -3,16 +3,13 @@ FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Download dependencies
+# Copy dependency manifests and source
 COPY go.mod ./
-# COPY go.sum ./
-RUN go mod download || true
-
-# Copy source
+COPY go.sum* ./
 COPY . .
 
-# Build statically linked binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /tailbeacon ./cmd/tailbeacon
+# Download dependencies and tidy
+RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /tailbeacon ./cmd/tailbeacon
 
 # Minimal runtime image
 FROM alpine:3.20
@@ -21,7 +18,10 @@ RUN apk add --no-cache ca-certificates tzdata
 
 COPY --from=builder /tailbeacon /usr/local/bin/tailbeacon
 
-EXPOSE 8096/tcp
-EXPOSE 7359/udp
+# Ports: Jellyfin (8096/TCP, 7359/UDP), Plex (32400/TCP, 32414/UDP), mDNS (5353/UDP)
+EXPOSE 8096/tcp 32400/tcp 7359/udp 32414/udp 5353/udp
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD /usr/local/bin/tailbeacon -health-check -config /etc/tailbeacon/tailbeacon.json 2>/dev/null || /usr/local/bin/tailbeacon -health-check || exit 1
 
 ENTRYPOINT ["tailbeacon"]
