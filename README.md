@@ -8,6 +8,11 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 [![Binary Size](https://img.shields.io/badge/Binary-<7MB-success.svg)](https://github.com/shimco/meshbeacon/releases)
 
+> [!IMPORTANT]
+> **Project Status: Public Beta (v0.6)**  
+> Meshbeacon is actively being tested across diverse homelab setups. It has been validated in production with **Jellyfin on Docker** streaming to **Google TV, Android TV, and Apple TV (Swiftfin & Infuse)**.  
+> Plex, Immich, Audiobookshelf, and OpenWrt travel router builds are currently in active community testing. **If you encounter discovery quirks with specific smart TVs or router setups, please open a [GitHub Issue](https://github.com/shimco/meshbeacon/issues)—your feedback directly drives the roadmap!**
+
 ---
 
 ## 🎯 Key Use Cases
@@ -175,6 +180,20 @@ meshbeacon
 
 ---
 
+## 💾 Pragmatic Hardware & Asset Caching Strategy
+
+Media server posters and photo thumbnails are small (50KB–400KB), but loading 200 of them over a high-latency WAN mesh slows down TV interfaces. Meshbeacon is architected to handle caching safely across wildly different hardware profiles:
+
+| Hardware Profile | Default Caching Strategy | Why? |
+| :--- | :--- | :--- |
+| **OpenWrt Travel Routers** *(128MB–256MB RAM)* | **Conservative RAM (16MB–32MB) or Disabled** | Routers must never run out of memory for packet routing and firewall tables. Auto-detection keeps memory footprint minuscule (<10MB). |
+| **Raspberry Pi on Micro-SD** *(512MB–8GB RAM)* | **RAM LRU (64MB–128MB)** | Eliminates **micro-SD card flash wear** by keeping all thumbnail caching strictly in RAM. Zero disk writes = zero burnt-out SD cards. |
+| **Mini-PCs, Servers, & NVMe USB Storage** | **Persistent Disk / Volume Mount** | Pass a Docker volume (`-v ./cache:/var/cache/meshbeacon`) and configure `max_gb: 10` to store gigabytes of posters and thumbnails permanently across reboots. |
+
+*(All cache limits and storage targets will be adjustable in real-time via the upcoming Web GUI).*
+
+---
+
 ## 🗺️ Roadmap
 
 - [x] **v0.1:** Core Go streaming reverse proxy + zero-allocation `sync.Pool` buffer.
@@ -183,9 +202,10 @@ meshbeacon
 - [x] **v0.4:** Multicast DNS (mDNS / Bonjour) for Apple TV (Swiftfin) and Infuse.
 - [x] **v0.5:** Automated Server ID & metadata detection from upstream servers.
 - [x] **v0.6:** Built-in CLI health checking for Docker autoheal / Watchtower.
-- [ ] **v0.7:** Turnkey Raspberry Pi appliance installer script (`curl ... | bash`).
-- [ ] **v0.8:** LRU memory/disk cache for image thumbnails and static UI bundles.
-- [ ] **v0.9:** Web GUI dashboard for one-click service toggles and Tailnet status.
+- [ ] **v0.7:** Immich mDNS photo sync profile (`_immich._tcp`) & digital photo frame support.
+- [ ] **v0.8:** Hardware-aware Dual-Tier Asset Caching (RAM LRU vs. persistent disk).
+- [ ] **v0.9:** Embedded Web GUI with dual-interface binding (local LAN + remote Mesh).
+- [ ] **v1.0:** Turnkey Raspberry Pi appliance installer script & OpenWrt procd package.
 
 ---
 
