@@ -29,8 +29,8 @@ func main() {
 	var (
 		configFile       = flag.String("config", getEnv("CONFIG_FILE", ""), "Path to JSON configuration file")
 		advertiseHost    = flag.String("advertise-host", getEnv("ADVERTISE_HOST", "auto"), "Local host/IP advertised to LAN clients ('auto' to detect)")
-		upstreamJellyfin = flag.String("jellyfin", getEnv("UPSTREAM_JELLYFIN", "http://mediaserver.horse-pancake.ts.net:8096"), "Upstream Jellyfin URL")
-		upstreamPlex     = flag.String("plex", getEnv("UPSTREAM_PLEX", "http://mediaserver.horse-pancake.ts.net:32400"), "Upstream Plex URL")
+		upstreamJellyfin = flag.String("jellyfin", getEnv("UPSTREAM_JELLYFIN", ""), "Upstream Jellyfin URL (e.g. http://mediaserver:8096)")
+		upstreamPlex     = flag.String("plex", getEnv("UPSTREAM_PLEX", ""), "Upstream Plex URL (e.g. http://mediaserver:32400)")
 		healthCheck      = flag.Bool("health-check", false, "Run health check against configured services and exit")
 	)
 	flag.Parse()
@@ -92,18 +92,58 @@ func main() {
 	}()
 
 	// 6. Start Discovery Beacons (Both UDP probes and mDNS/Bonjour)
-	for _, svc := range cfg.Services {
+	for i := range cfg.Services {
+		svc := &cfg.Services[i]
 		var beacons []discovery.Beacon
 
 		switch svc.Discovery.Type {
 		case "jellyfin":
+			// Auto-detect server ID and name from upstream if not explicitly provided
+			if svc.Discovery.ServerID == "" || svc.Discovery.ServerName == "" {
+				detectCtx, detectCancel := context.WithTimeout(ctx, 3*time.Second)
+				id, name, err := discovery.DetectJellyfinInfo(detectCtx, svc.UpstreamURL)
+				detectCancel()
+				if err == nil {
+					if svc.Discovery.ServerID == "" {
+						svc.Discovery.ServerID = id
+					}
+					if svc.Discovery.ServerName == "" {
+						svc.Discovery.ServerName = name
+					}
+				} else {
+					log.Printf("[Jellyfin Beacon] Auto-detect failed for %s (%v), using fallback identity", svc.UpstreamURL, err)
+					if svc.Discovery.ServerID == "" {
+						svc.Discovery.ServerID = discovery.FallbackServerID(svc.UpstreamURL)
+					}
+					if svc.Discovery.ServerName == "" {
+						svc.Discovery.ServerName = "Jellyfin"
+					}
+				}
+			}
+
 			targetAddr := fmt.Sprintf("%s:%d", cfg.AdvertiseAddr, svc.LocalPort)
-			// UDP 7359 Probe Responder
+			// UDP 7359 Probe Responder + Active Broadcaster
 			beacons = append(beacons, discovery.NewJellyfinBeacon(svc.Discovery.Port, targetAddr, svc.Discovery.ServerID, svc.Discovery.ServerName))
 			// mDNS / Bonjour Announcer (_jellyfin._tcp)
 			beacons = append(beacons, discovery.NewMDNSBeacon(svc.Discovery.ServerName, "_jellyfin._tcp", svc.LocalPort, []string{"path=/"}))
 
 		case "plex":
+			// Auto-detect machineIdentifier from upstream if not provided
+			if svc.Discovery.ServerID == "" {
+				detectCtx, detectCancel := context.WithTimeout(ctx, 3*time.Second)
+				id, err := discovery.DetectPlexInfo(detectCtx, svc.UpstreamURL)
+				detectCancel()
+				if err == nil {
+					svc.Discovery.ServerID = id
+				} else {
+					log.Printf("[Plex Beacon] Auto-detect failed for %s (%v), using fallback identity", svc.UpstreamURL, err)
+					svc.Discovery.ServerID = discovery.FallbackServerID(svc.UpstreamURL)
+				}
+			}
+			if svc.Discovery.ServerName == "" {
+				svc.Discovery.ServerName = "Plex Media Server"
+			}
+
 			// UDP 32414 GDM Probe Responder
 			beacons = append(beacons, discovery.NewPlexGDMBeacon(svc.Discovery.Port, svc.Discovery.ServerName, svc.LocalPort, svc.Discovery.ServerID))
 			// mDNS / Bonjour Announcer (_plexmediasvr._tcp)

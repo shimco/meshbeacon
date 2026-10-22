@@ -81,41 +81,56 @@ Tailbeacon bridges your remote Tailscale media server into your local home Wi-Fi
 
 ## ⚡ Quick Start
 
-### Option A: Docker Compose
+### Option A: Docker Compose (Recommended)
 
-```yaml
-services:
-  tailbeacon:
-    image: ghcr.io/shimco/tailbeacon:latest
-    container_name: tailbeacon
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      - UPSTREAM_JELLYFIN=http://mediaserver.horse-pancake.ts.net:8096
-      - LOCAL_PORT=8096
-      - SERVER_NAME="Living Room Mediaserver"
-```
+1. Copy the example configuration:
+   ```bash
+   cp tailbeacon.example.json tailbeacon.json
+   ```
+2. Edit `tailbeacon.json` with your upstream Tailscale URLs (e.g. `http://mediaserver.your-tailnet.ts.net:8096`).
+3. Run with `docker-compose.yml`:
+   ```yaml
+   services:
+     tailbeacon:
+       image: ghcr.io/shimco/tailbeacon:latest
+       container_name: tailbeacon
+       restart: unless-stopped
+       network_mode: host
+       command: ["-config", "/etc/tailbeacon/tailbeacon.json"]
+       volumes:
+         - ./tailbeacon.json:/etc/tailbeacon/tailbeacon.json:ro
+   ```
+   ```bash
+   docker compose up -d
+   ```
 
-### Option B: Standalone Binary (Raspberry Pi / Linux)
+### Option B: Standalone Binary (Raspberry Pi / Linux / OpenWrt)
+
+Run directly using flags or environment variables (server IDs and names are automatically discovered from the upstream servers):
 
 ```bash
-# Download latest release
-curl -sSL https://github.com/shimco/tailbeacon/releases/latest/download/tailbeacon-linux-arm64.tar.gz | tar -xz
-sudo mv tailbeacon /usr/local/bin/
+# Using CLI flags
+tailbeacon -jellyfin http://mediaserver.your-tailnet.ts.net:8096 -plex http://mediaserver.your-tailnet.ts.net:32400
 
-# Run as a background service
-tailbeacon --upstream http://mediaserver:8096 --name "Home Gateway"
+# Or via environment variables
+export UPSTREAM_JELLYFIN="http://mediaserver.your-tailnet.ts.net:8096"
+export UPSTREAM_PLEX="http://mediaserver.your-tailnet.ts.net:32400"
+tailbeacon
 ```
 
 ---
 
 ## 🗺️ Roadmap
 
-- [ ] **v0.1:** Core Go streaming reverse proxy + UDP 7359 Jellyfin discovery responder.
-- [ ] **v0.2:** Avahi / mDNS zero-conf integration and Plex GDM broadcast relay.
-- [ ] **v0.3:** Web GUI dashboard for one-click service toggles and Tailnet health check.
-- [ ] **v0.4:** LRU memory/disk cache for image thumbnails and static UI bundles.
-- [ ] **v0.5:** Turnkey Raspberry Pi appliance installer script (`curl ... | bash`).
+- [x] **v0.1:** Core Go streaming reverse proxy + zero-allocation `sync.Pool` buffer.
+- [x] **v0.2:** Jellyfin UDP 7359 active + passive multi-subnet autodiscovery.
+- [x] **v0.3:** Plex GDM UDP 32414 broadcast responder.
+- [x] **v0.4:** Multicast DNS (mDNS / Bonjour) for Apple TV (Swiftfin) and Infuse.
+- [x] **v0.5:** Automated Server ID & metadata detection from upstream servers.
+- [x] **v0.6:** Built-in CLI health checking for Docker autoheal / Watchtower.
+- [ ] **v0.7:** Turnkey Raspberry Pi appliance installer script (`curl ... | bash`).
+- [ ] **v0.8:** LRU memory/disk cache for image thumbnails and static UI bundles.
+- [ ] **v0.9:** Web GUI dashboard for one-click service toggles and Tailnet status.
 
 ---
 

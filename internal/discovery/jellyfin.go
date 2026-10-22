@@ -52,7 +52,7 @@ func NewJellyfinBeacon(port int, advertiseAddr, serverId, serverName string) *Je
 	return &JellyfinBeacon{
 		port:            port,
 		payload:         payload,
-		broadcastPeriod: 10 * time.Second,
+		broadcastPeriod: 30 * time.Second,
 	}
 }
 
@@ -80,10 +80,22 @@ func (b *JellyfinBeacon) Start(ctx context.Context) error {
 
 	log.Printf("[Jellyfin Beacon] Listening on UDP %d (passive + active broadcast every %s)", b.port, b.broadcastPeriod)
 
-	// Active broadcaster goroutine
+	// Active broadcaster goroutine with fast initial convergence
 	go func() {
+		// 1. Initial immediate broadcast
 		b.broadcastAll(conn)
 
+		// 2. Fast-burst phase: 2 bursts at 5s intervals to quickly register with any active app
+		for i := 0; i < 2; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				b.broadcastAll(conn)
+			}
+		}
+
+		// 3. Polite steady-state: standard 30-second broadcast cadence
 		ticker := time.NewTicker(b.broadcastPeriod)
 		defer ticker.Stop()
 		for {
