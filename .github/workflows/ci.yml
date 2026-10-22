@@ -31,4 +31,5 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
+          go mod tidy
           go build -v -ldflags="-s -w" -o meshbeacon-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/meshbeacon
