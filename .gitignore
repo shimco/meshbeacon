@@ -1,5 +1,5 @@
 # Binaries
-tailbeacon
+/tailbeacon
 *.exe
 *.exe~
 *.dll
