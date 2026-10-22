@@ -10,7 +10,7 @@
 
 > [!IMPORTANT]
 > **Project Status: Public Beta (v0.6)**  
-> Meshbeacon is actively being tested across diverse homelab setups. It has been validated in production with **Jellyfin on Docker** streaming to **Google TV, Android TV, and Apple TV (Swiftfin & Infuse)**.  
+> Meshbeacon is actively being tested across diverse homelab setups. It has been validated in production with **Jellyfin on Docker** streaming to **Google TV and Android TV**.  
 > Plex, Immich, Audiobookshelf, and OpenWrt travel router builds are currently in active community testing. **If you encounter discovery quirks with specific smart TVs or router setups, please open a [GitHub Issue](https://github.com/shimco/meshbeacon/issues)—your feedback directly drives the roadmap!**
 
 ---
@@ -33,7 +33,7 @@
 
 Running VPN client apps directly on Smart TVs (Google TV, Android TV, Apple TV, Fire TV, Roku, webOS, Tizen) causes chronic friction:
 1. **Aggressive Standby Sleep:** Smart TV OSes ruthlessly kill background VPN processes to conserve RAM. Waking the TV from standby leaves the WireGuard tunnel dead, causing media apps to buffer or hang indefinitely.
-2. **Family Support Overhead:** Explaining VPN client toggles, MFA, or IP configuration to non-technical partners or parents is frustrating, and doesn't pass SFA benchmarks...
+2. **Family Support Overhead:** Explaining VPN client toggles, MFA, or IP configuration to non-technical partners or parents is frustrating, and doesn't pass SAF benchmarks...
 3. **Underpowered Hardware:** Low-cost TV chipsets struggle with background cryptographic packet processing during high-bitrate 4K HDR streams, and they crash.
 
 ## 🚀 The Solution: Meshbeacon
@@ -52,7 +52,7 @@ Meshbeacon bridges your remote media server into your local home Wi-Fi:
 
 ```text
  ┌────────────────────────────────────────────────────────┐
- │                   Offsite Media Server / NAS                  │
+ │              Offsite Media Server / NAS                │
  │          (Plex, Jellyfin, Navidrome, Kavita)           │
  └───────────────────────────┬────────────────────────────┘
                              │
