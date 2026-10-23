@@ -333,7 +333,11 @@ func NewDualTierCache(ramBytes int64, diskDir string, diskBytes int64, ttl time.
 	}
 
 	if ttl <= 0 {
-		ttl = 30 * 24 * time.Hour // default 30 days
+		if disk != nil {
+			ttl = 90 * 24 * time.Hour // default 90 days for persistent disk
+		} else {
+			ttl = 30 * 24 * time.Hour // default 30 days for RAM-only
+		}
 	}
 
 	return &DualTierCache{

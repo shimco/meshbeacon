@@ -51,10 +51,10 @@ func CalculateAutoDiskCacheSize(freeBytes int64) int64 {
 	}
 }
 
-// ParseTTL parses human-readable duration strings like "30d", "90d", "180d", "1y", "720h".
+// ParseTTL parses human-readable duration strings like "auto", "30d", "90d", "180d", "1y", "720h".
 func ParseTTL(str string, defaultDuration time.Duration) time.Duration {
 	s := strings.TrimSpace(strings.ToLower(str))
-	if s == "" {
+	if s == "" || s == "auto" {
 		return defaultDuration
 	}
 

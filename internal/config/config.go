@@ -64,7 +64,7 @@ type CacheConfig struct {
 	RAMSize  string `json:"ram_size"`  // "auto", "64MB", "off"
 	DiskDir  string `json:"disk_dir"`  // "" (disabled), or path to directory
 	DiskSize string `json:"disk_size"` // "auto", "5GB"
-	TTL      string `json:"ttl"`       // "30d", "7d"
+	TTL      string `json:"ttl"`       // "auto" (30d RAM, 90d disk), "30d", "90d", "180d", "1y"
 }
 
 // Config represents the complete Meshbeacon runtime configuration.
@@ -85,7 +85,7 @@ func LoadConfig(filePath string) (*Config, error) {
 	// Defaults
 	cfg.Cache.Enabled = true
 	cfg.Cache.RAMSize = "auto"
-	cfg.Cache.TTL = "30d"
+	cfg.Cache.TTL = "auto"
 
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("invalid json in config file: %w", err)
@@ -95,7 +95,7 @@ func LoadConfig(filePath string) (*Config, error) {
 		cfg.Cache.RAMSize = "auto"
 	}
 	if cfg.Cache.TTL == "" {
-		cfg.Cache.TTL = "30d"
+		cfg.Cache.TTL = "auto"
 	}
 
 	return &cfg, nil
@@ -110,7 +110,7 @@ func DefaultConfig(advertiseHost, upstreamJellyfin, upstreamPlex, upstreamImmich
 			RAMSize:  "auto",
 			DiskDir:  "",
 			DiskSize: "auto",
-			TTL:      "30d",
+			TTL:      "auto",
 		},
 		Services: make([]ServiceConfig, 0),
 	}

@@ -269,6 +269,7 @@ func TestParseTTL(t *testing.T) {
 		expected time.Duration
 	}{
 		{"", defaultTTL},
+		{"auto", defaultTTL},
 		{"30d", 30 * 24 * time.Hour},
 		{"90d", 90 * 24 * time.Hour},
 		{"180d", 180 * 24 * time.Hour},

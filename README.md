@@ -324,7 +324,7 @@ Or in `meshbeacon.json`:
     "ram_size": "auto",
     "disk_dir": "/var/cache/meshbeacon",
     "disk_size": "auto",
-    "ttl": "90d"
+    "ttl": "auto"
   }
 }
 ```
@@ -332,7 +332,7 @@ Or in `meshbeacon.json`:
 > [!NOTE]
 > **Intelligent "Auto" Sizing & Fail-Safe Protection:**
 > * **Adaptive Free Space Scaling**: When `disk_size` is `"auto"`, Meshbeacon inspects available drive space via `statfs` and safely allocates up to 50% of free space (capped at **10 GB** on spacious NVMe drives for Immich photo frames, or down to **250 MB** on small USB thumb drives).
-> * **Extended 90-Day TTL**: Disk cache automatically extends default TTL to **90 days** (`90d`), preventing redundant WAN re-downloads of static posters and photo slideshows.
+> * **Extended Auto TTL**: When `ttl` is `"auto"`, Meshbeacon uses **30 days** in RAM-only mode, and automatically extends to **90 days** (`90d`) when persistent disk is enabled, preventing redundant WAN re-downloads of static posters and photo slideshows while allowing manual override (`"180d"`, `"1y"`).
 > * **50 MB Safety Floor & Self-Pruning**: If drive free space ever drops below 50 MB, or when 95% quota is reached, Meshbeacon automatically prunes the oldest 15% of assets down to 80%. If the drive is completely full, Meshbeacon gracefully falls back to live streaming with **zero crashes and zero TV playback interruptions**.
 > * Set `ram_size: "off"` for **Pure Disk Mode** if you want zero image data stored in RAM.
 

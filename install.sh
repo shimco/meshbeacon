@@ -250,7 +250,7 @@ EOF
     "ram_size": "auto",
     "disk_dir": "",
     "disk_size": "auto",
-    "ttl": "30d"
+    "ttl": "auto"
   },
   "services": [
     {
@@ -292,7 +292,7 @@ if [ "${TARGET_OS}" = "linux" ]; then
     "ram_size": "auto",
     "disk_dir": "",
     "disk_size": "auto",
-    "ttl": "30d"
+    "ttl": "auto"
   },
   "services": [
     {
