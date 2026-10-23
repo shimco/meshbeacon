@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -39,12 +40,44 @@ func main() {
 		cacheDir         = flag.String("cache-dir", getEnv("CACHE_DIR", ""), "Optional persistent disk cache directory (default off)")
 		cacheDisk        = flag.String("cache-disk-size", getEnv("CACHE_DISK_SIZE", "auto"), "Max disk cache size if cache-dir is enabled ('auto', '2GB')")
 		healthCheck      = flag.Bool("health-check", false, "Run health check against configured services and exit")
+		clearCache       = flag.Bool("clear-cache", false, "Clear all cached assets from disk and exit")
 		showVersion      = flag.Bool("version", false, "Print Meshbeacon version and exit")
 	)
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("meshbeacon %s\n", version)
+		os.Exit(0)
+	}
+
+	// Cache Clearing Mode (Used for manual maintenance or during uninstall/purge)
+	if *clearCache {
+		targetDir := *cacheDir
+		if targetDir == "" && *configFile != "" {
+			if loadedCfg, err := config.LoadConfig(*configFile); err == nil {
+				targetDir = loadedCfg.Cache.DiskDir
+			}
+		}
+		if targetDir == "" {
+			targetDir = "/var/cache/meshbeacon"
+		}
+
+		dt, err := cache.NewDiskTier(targetDir, 1*cache.GB)
+		if err != nil {
+			fmt.Printf("🧹 Meshbeacon: Could not open disk cache directory %s: %v\n", targetDir, err)
+			os.Exit(0)
+		}
+
+		count, freed, err := dt.Clear()
+		if err != nil {
+			fmt.Printf("🧹 Meshbeacon: Error clearing disk cache at %s: %v\n", targetDir, err)
+			os.Exit(1)
+		}
+		if count == 0 {
+			fmt.Printf("🧹 Meshbeacon: Disk cache at %s is already empty.\n", targetDir)
+		} else {
+			fmt.Printf("🧹 Meshbeacon: Cleared %d cached assets (%s freed) from %s\n", count, cache.FormatSize(freed), targetDir)
+		}
 		os.Exit(0)
 	}
 
@@ -117,7 +150,13 @@ func main() {
 		hasDisk := cfg.Cache.DiskDir != ""
 		var diskBytes int64
 		if hasDisk {
-			autoDisk := int64(2 * 1024 * 1024 * 1024) // 2GB default
+			var freeBytes int64
+			if free, err := cache.AvailableDiskSpace(cfg.Cache.DiskDir); err == nil {
+				freeBytes = free
+			} else if freeParent, errParent := cache.AvailableDiskSpace(filepath.Dir(cfg.Cache.DiskDir)); errParent == nil {
+				freeBytes = freeParent
+			}
+			autoDisk := cache.CalculateAutoDiskCacheSize(freeBytes)
 			diskBytes, _ = cache.ParseSize(cfg.Cache.DiskSize, autoDisk)
 		}
 
@@ -136,7 +175,11 @@ func main() {
 		}
 
 		if ramBytes > 0 || (hasDisk && diskBytes > 0) {
-			ttl := 30 * 24 * time.Hour
+			defaultTTL := 30 * 24 * time.Hour
+			if hasDisk {
+				defaultTTL = 90 * 24 * time.Hour // Bump default to 90 days when persistent disk is enabled
+			}
+			ttl := cache.ParseTTL(cfg.Cache.TTL, defaultTTL)
 			assetCache, err = cache.NewDualTierCache(ramBytes, cfg.Cache.DiskDir, diskBytes, ttl)
 			if err != nil {
 				log.Printf("[Cache Warning] Failed to initialize cache: %v", err)
@@ -149,8 +192,9 @@ func main() {
 				if hasDisk && diskBytes > 0 {
 					diskDesc = fmt.Sprintf("%s at %s", cache.FormatSize(diskBytes), cfg.Cache.DiskDir)
 				}
-				log.Printf("[Asset Cache] Active: RAM=%s (host RAM %s), Disk=%s, TTL=30d",
-					ramDesc, cache.FormatSize(totalRAM), diskDesc)
+				ttlDays := int(ttl.Hours() / 24)
+				log.Printf("[Asset Cache] Active: RAM=%s (host RAM %s), Disk=%s, TTL=%dd",
+					ramDesc, cache.FormatSize(totalRAM), diskDesc, ttlDays)
 			}
 		} else {
 			log.Println("[Asset Cache] Disabled (RAM and Disk are off)")

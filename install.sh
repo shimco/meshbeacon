@@ -80,12 +80,18 @@ uninstall() {
     fi
   done
 
-  # 4. Handle configuration directory
-  if [ -d "${CONFIG_DIR}" ]; then
-    if [ "${1:-}" = "--purge" ] || [ "${PURGE:-0}" = "1" ]; then
+  # 4. Handle configuration and cache directory
+  if [ "${1:-}" = "--purge" ] || [ "${PURGE:-0}" = "1" ]; then
+    if [ -d "${CONFIG_DIR}" ]; then
       log "Purging configuration directory: ${CONFIG_DIR}..."
       run_as_root rm -rf "${CONFIG_DIR}"
-    else
+    fi
+    if [ -d "/var/cache/meshbeacon" ]; then
+      log "Purging asset disk cache: /var/cache/meshbeacon..."
+      run_as_root rm -rf "/var/cache/meshbeacon"
+    fi
+  else
+    if [ -d "${CONFIG_DIR}" ]; then
       log "Configuration preserved at ${CONFIG_DIR} (pass '--purge' to delete)."
     fi
   fi

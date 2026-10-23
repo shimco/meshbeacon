@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -214,10 +216,90 @@ func (d *DiskTier) Set(item *Item) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	// 1. Check if write would exceed soft maxBytes quota (prune to 80% if needed)
+	if d.maxBytes > 0 && d.curBytes+item.Size > d.maxBytes {
+		d.pruneLocked(int64(float64(d.maxBytes) * 0.80))
+		if d.curBytes+item.Size > d.maxBytes {
+			return // Still over quota, skip writing safely
+		}
+	}
+
+	// 2. Check if host filesystem free space is below safety floor (50 MB)
+	if free, err := AvailableDiskSpace(d.dir); err == nil && free < MinDiskFreeSpaceFloor {
+		d.pruneLocked(int64(float64(d.curBytes) * 0.80))
+		if freeAfter, errAfter := AvailableDiskSpace(d.dir); errAfter == nil && freeAfter < MinDiskFreeSpaceFloor {
+			return // Host disk space critically low, protect system by skipping write
+		}
+	}
+
 	if err := os.WriteFile(fp, item.Data, 0644); err == nil {
 		_ = os.WriteFile(fp+".meta", metaBytes, 0644)
 		d.curBytes += item.Size
 	}
+}
+
+type fileEntry struct {
+	path    string
+	size    int64
+	modTime time.Time
+}
+
+func (d *DiskTier) pruneLocked(targetBytes int64) {
+	var files []fileEntry
+	_ = filepath.Walk(d.dir, func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() && !strings.HasSuffix(path, ".meta") {
+			files = append(files, fileEntry{
+				path:    path,
+				size:    info.Size(),
+				modTime: info.ModTime(),
+			})
+		}
+		return nil
+	})
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].modTime.Before(files[j].modTime)
+	})
+
+	for _, f := range files {
+		if d.curBytes <= targetBytes {
+			break
+		}
+		_ = os.Remove(f.path)
+		_ = os.Remove(f.path + ".meta")
+		d.curBytes -= f.size
+	}
+}
+
+// Clear removes all cached assets and metadata files from the disk cache directory.
+func (d *DiskTier) Clear() (int, int64, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	var count int
+	var freed int64
+
+	entries, err := os.ReadDir(d.dir)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	for _, entry := range entries {
+		p := filepath.Join(d.dir, entry.Name())
+		_ = filepath.Walk(p, func(path string, info os.FileInfo, err error) error {
+			if err == nil && !info.IsDir() {
+				if !strings.HasSuffix(path, ".meta") {
+					count++
+				}
+				freed += info.Size()
+			}
+			return nil
+		})
+		_ = os.RemoveAll(p)
+	}
+
+	d.curBytes = 0
+	return count, freed, nil
 }
 
 func (d *DiskTier) Size() int64 {
@@ -329,4 +411,20 @@ func (c *DualTierCache) Stats() Stats {
 		RAMBytes:  bytes,
 		DiskBytes: diskBytes,
 	}
+}
+
+// ClearDisk removes all assets from the persistent disk tier.
+func (c *DualTierCache) ClearDisk() (int, int64, error) {
+	if c.disk == nil {
+		return 0, 0, nil
+	}
+	return c.disk.Clear()
+}
+
+// DiskDir returns the configured disk cache path, or empty if disabled.
+func (c *DualTierCache) DiskDir() string {
+	if c.disk == nil {
+		return ""
+	}
+	return c.disk.dir
 }

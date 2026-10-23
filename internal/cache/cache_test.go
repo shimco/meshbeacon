@@ -239,3 +239,86 @@ func TestPureDiskCache(t *testing.T) {
 		t.Errorf("expected 1 hit, got %d", statsAfter.Hits)
 	}
 }
+
+func TestCalculateAutoDiskCacheSize(t *testing.T) {
+	tests := []struct {
+		freeSpace int64
+		expected  int64
+	}{
+		{freeSpace: 200 * MB, expected: 150 * MB}, // 200MB - 50MB safety reserve
+		{freeSpace: 600 * MB, expected: 300 * MB}, // 50% of 600MB
+		{freeSpace: 2 * GB, expected: 1 * GB},     // 50% of 2GB
+		{freeSpace: 10 * GB, expected: 5 * GB},    // 50% of 10GB
+		{freeSpace: 100 * GB, expected: 10 * GB},  // Capped at 10GB max
+	}
+
+	for _, tc := range tests {
+		actual := CalculateAutoDiskCacheSize(tc.freeSpace)
+		if actual != tc.expected {
+			t.Errorf("For free space %s, expected disk cache size %s, got %s",
+				FormatSize(tc.freeSpace), FormatSize(tc.expected), FormatSize(actual))
+		}
+	}
+}
+
+func TestParseTTL(t *testing.T) {
+	defaultTTL := 30 * 24 * time.Hour
+
+	tests := []struct {
+		input    string
+		expected time.Duration
+	}{
+		{"", defaultTTL},
+		{"30d", 30 * 24 * time.Hour},
+		{"90d", 90 * 24 * time.Hour},
+		{"180d", 180 * 24 * time.Hour},
+		{"2w", 14 * 24 * time.Hour},
+		{"1y", 365 * 24 * time.Hour},
+		{"24h", 24 * time.Hour},
+		{"invalid", defaultTTL},
+	}
+
+	for _, tc := range tests {
+		actual := ParseTTL(tc.input, defaultTTL)
+		if actual != tc.expected {
+			t.Errorf("For input %q, expected TTL %v, got %v", tc.input, tc.expected, actual)
+		}
+	}
+}
+
+func TestDiskClear(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "meshbeacon_clear_test_*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	c, err := NewDualTierCache(10*MB, tempDir, 50*MB, 1*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c.Set("key1", []byte("asset_data_one"), "image/jpeg", "tag1")
+	c.Set("key2", []byte("asset_data_two"), "image/png", "tag2")
+
+	// Allow goroutine async disk writes to finish
+	time.Sleep(50 * time.Millisecond)
+
+	count, freed, err := c.ClearDisk()
+	if err != nil {
+		t.Fatalf("unexpected error clearing disk cache: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("expected 2 items cleared, got %d", count)
+	}
+	if freed <= 0 {
+		t.Errorf("expected positive bytes freed, got %d", freed)
+	}
+
+	// Verify disk stats are reset
+	stats := c.Stats()
+	if stats.DiskBytes != 0 {
+		t.Errorf("expected 0 disk bytes after clear, got %d", stats.DiskBytes)
+	}
+}

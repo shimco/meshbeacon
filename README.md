@@ -305,12 +305,15 @@ If you run Meshbeacon on a homelab server, mini-PC, or NAS with an SSD or NVMe d
 
 ```bash
 # 1. Balanced Mode (Default "auto" when disk is enabled):
-# Automatically scales RAM to a 64MB–128MB hot-buffer (128MB on >=4GB hosts) and stores up to 10GB on SSD
-meshbeacon -cache-dir /mnt/nvme/meshbeacon -cache-disk-size 10GB
+# Automatically scales RAM to a 64MB–128MB hot-buffer, auto-sizes disk up to 10GB, and bumps TTL to 90 days
+meshbeacon -cache-dir /mnt/nvme/meshbeacon
 
 # 2. Pure NVMe Disk Only (0 MB RAM used for images):
 # Reads 100% of cached assets directly from NVMe, dropping base RAM to ~4MB
 meshbeacon -cache-ram off -cache-dir /mnt/nvme/meshbeacon -cache-disk-size 2GB
+
+# 3. Privacy & Maintenance: Clear disk cache anytime
+meshbeacon -clear-cache
 ```
 
 Or in `meshbeacon.json`:
@@ -320,17 +323,18 @@ Or in `meshbeacon.json`:
     "enabled": true,
     "ram_size": "auto",
     "disk_dir": "/var/cache/meshbeacon",
-    "disk_size": "2GB",
-    "ttl": "30d"
+    "disk_size": "auto",
+    "ttl": "90d"
   }
 }
 ```
 
 > [!NOTE]
-> **Intelligent "Auto" Downscaling with Disk:**
-> * When `disk_dir` is **disabled**: `ram_size: "auto"` uses your full hardware bracket (up to 512MB on servers) to guard remote WAN mesh bandwidth.
-> * When `disk_dir` is **enabled**: `ram_size: "auto"` scales down to a tailored hot-buffer: **64MB** on 1GB–2GB SBCs, or **128MB** (~3,200 posters) on $\ge$4GB servers, saving ~400MB of host RAM while keeping entire household media catalogs instant in memory.
-> * Set `ram_size: "off"` for **Pure Disk Mode** if you want zero image data stored in RAM. On modern NVMe SSDs (read latency ~0.02ms), local Wi-Fi latency (2–10ms) is the only limiting factor.
+> **Intelligent "Auto" Sizing & Fail-Safe Protection:**
+> * **Adaptive Free Space Scaling**: When `disk_size` is `"auto"`, Meshbeacon inspects available drive space via `statfs` and safely allocates up to 50% of free space (capped at **10 GB** on spacious NVMe drives for Immich photo frames, or down to **250 MB** on small USB thumb drives).
+> * **Extended 90-Day TTL**: Disk cache automatically extends default TTL to **90 days** (`90d`), preventing redundant WAN re-downloads of static posters and photo slideshows.
+> * **50 MB Safety Floor & Self-Pruning**: If drive free space ever drops below 50 MB, or when 95% quota is reached, Meshbeacon automatically prunes the oldest 15% of assets down to 80%. If the drive is completely full, Meshbeacon gracefully falls back to live streaming with **zero crashes and zero TV playback interruptions**.
+> * Set `ram_size: "off"` for **Pure Disk Mode** if you want zero image data stored in RAM.
 
 *(Video streaming chunks `.ts`, `.m3u8`, and Range requests bypass the cache entirely and stream directly through the zero-allocation 32KB buffer pool).*
  
