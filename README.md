@@ -100,7 +100,8 @@ Meshbeacon bridges your remote media server into your local home Wi-Fi:
   - ⚡ **Next-Gen RISC-V:** Native `linux/riscv64` (VisionFive 2, Milk-V, SpacemiT).
   - 💻 **x86_64:** Intel N100 mini-PCs, Proxmox, TrueNAS, unRAID, OPNsense/pfSense.
 - [x] **Dual-Tier Asset Caching:** High-speed in-memory LRU cache with hardware-bracketed auto-scaling (8MB on 128MB routers to 512MB on servers) to eliminate SD card/flash wear, plus optional persistent SSD/disk tier for multi-gigabyte library caching.
-- [ ] **OpenWrt Native Service:** Lightweight `/etc/init.d/meshbeacon` procd service + UCI configuration (<3MB binary with UPX).
+- [x] **Generic mDNS & Multi-App Discovery:** Extensible DNS-SD engine supporting Immich photo sync (`_immich._tcp`), AirPrint / CUPS (`_ipp._tcp`), HomeKit (`_hap._tcp`), and custom services without extra code or dependencies.
+- [x] **OpenWrt Native Service & Turnkey Installer:** Lightweight procd `/etc/init.d/meshbeacon` service and POSIX install/uninstall script with SHA-256 verification (<3MB binary).
 - [ ] **Embedded Web GUI:** Modern, dark-mode configuration dashboard to toggle services, view active stream bitrates, and manage upstream routes.
 
 ---
@@ -274,7 +275,7 @@ Or in `meshbeacon.json`:
 - [x] **v0.5:** Automated Server ID & metadata detection from upstream servers.
 - [x] **v0.6:** Built-in CLI health checking for Docker autoheal / Watchtower.
 - [x] **v0.7:** Hardware-aware Dual-Tier Asset Caching (RAM LRU vs. persistent disk).
-- [ ] **v0.8:** Immich mDNS photo sync profile (`_immich._tcp`) & digital photo frame support.
+- [x] **v0.8:** Generic mDNS profiles & Immich photo sync (`_immich._tcp`, `_ipp._tcp`, custom DNS-SD).
 - [ ] **v0.9:** Embedded Web GUI with dual-interface binding (local LAN + remote Mesh).
 - [ ] **v1.0:** Turnkey Raspberry Pi appliance installer script & OpenWrt procd package.
  

@@ -4,19 +4,58 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 )
+
+// DiscoveryConfig defines service advertisement and autodiscovery parameters.
+type DiscoveryConfig struct {
+	Type       string            `json:"type"`        // "jellyfin", "plex", "immich", "mdns", "none"
+	Port       int               `json:"port"`        // Discovery port (e.g. 7359 for Jellyfin, 32414 for Plex)
+	ServerName string            `json:"server_name"` // Broadcast display name / mDNS instance name
+	ServerID   string            `json:"server_id"`   // Unique server identifier (auto-detected for Jellyfin/Plex)
+	Service    string            `json:"service"`     // mDNS service type, e.g. "_immich._tcp", "_ipp._tcp", "_hap._tcp"
+	TXT        map[string]string `json:"txt"`         // Custom mDNS TXT record key-value pairs
+}
+
+// NormalizeServiceType formats the service identifier into RFC 6763 DNS-SD format (e.g. "_immich._tcp").
+func (d *DiscoveryConfig) NormalizeServiceType(fallbackName string) string {
+	svc := strings.TrimSpace(d.Service)
+	if svc == "" {
+		svc = strings.TrimSpace(fallbackName)
+	}
+	if !strings.HasPrefix(svc, "_") {
+		svc = "_" + svc
+	}
+	if !strings.HasSuffix(svc, "._tcp") && !strings.HasSuffix(svc, "._udp") {
+		svc = svc + "._tcp"
+	}
+	return svc
+}
+
+// FormattedTXT returns the configured TXT key-value pairs as sorted strings.
+func (d *DiscoveryConfig) FormattedTXT() []string {
+	if len(d.TXT) == 0 {
+		return []string{"path=/"}
+	}
+	records := make([]string, 0, len(d.TXT))
+	for k, v := range d.TXT {
+		if v != "" {
+			records = append(records, fmt.Sprintf("%s=%s", k, v))
+		} else {
+			records = append(records, k)
+		}
+	}
+	sort.Strings(records)
+	return records
+}
 
 // ServiceConfig defines a single media service to bridge into the local LAN.
 type ServiceConfig struct {
-	Name        string `json:"name"`         // e.g. "jellyfin", "plex", "navidrome"
-	LocalPort   int    `json:"local_port"`   // e.g. 8096, 32400, 4533
-	UpstreamURL string `json:"upstream_url"` // e.g. "http://mediaserver.your-tailnet.ts.net:8096"
-	Discovery   struct {
-		Type       string `json:"type"`        // "jellyfin", "plex", "none"
-		Port       int    `json:"port"`        // Discovery port, e.g. 7359 or 32414
-		ServerName string `json:"server_name"` // Broadcast display name (auto-detected if blank)
-		ServerID   string `json:"server_id"`   // Unique server identifier (auto-detected if blank)
-	} `json:"discovery"`
+	Name        string          `json:"name"`         // e.g. "jellyfin", "plex", "immich", "cups"
+	LocalPort   int             `json:"local_port"`   // e.g. 8096, 32400, 2283, 631
+	UpstreamURL string          `json:"upstream_url"` // e.g. "http://mediaserver.your-tailnet.ts.net:8096"
+	Discovery   DiscoveryConfig `json:"discovery"`
 }
 
 // CacheConfig defines the dual-tier asset caching settings.
@@ -63,7 +102,7 @@ func LoadConfig(filePath string) (*Config, error) {
 }
 
 // DefaultConfig generates a sane multi-service configuration if no file is passed.
-func DefaultConfig(advertiseHost string, upstreamJellyfin string, upstreamPlex string) *Config {
+func DefaultConfig(advertiseHost, upstreamJellyfin, upstreamPlex, upstreamImmich string) *Config {
 	cfg := &Config{
 		AdvertiseAddr: advertiseHost,
 		Cache: CacheConfig{
@@ -99,6 +138,19 @@ func DefaultConfig(advertiseHost string, upstreamJellyfin string, upstreamPlex s
 		sc.Discovery.Port = 32414
 		sc.Discovery.ServerName = "" // Auto-detected from upstream
 		sc.Discovery.ServerID = ""   // Auto-detected from upstream
+		cfg.Services = append(cfg.Services, sc)
+	}
+
+	if upstreamImmich != "" {
+		sc := ServiceConfig{
+			Name:        "immich",
+			LocalPort:   2283,
+			UpstreamURL: upstreamImmich,
+		}
+		sc.Discovery.Type = "immich"
+		sc.Discovery.Service = "_immich._tcp"
+		sc.Discovery.ServerName = "Immich Photos"
+		sc.Discovery.TXT = map[string]string{"path": "/api"}
 		cfg.Services = append(cfg.Services, sc)
 	}
 

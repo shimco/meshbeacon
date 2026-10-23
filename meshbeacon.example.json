@@ -30,6 +30,33 @@
         "server_name": "Living Room Plex",
         "server_id": ""
       }
+    },
+    {
+      "name": "immich",
+      "local_port": 2283,
+      "upstream_url": "http://photos.your-tailnet.ts.net:2283",
+      "discovery": {
+        "type": "immich",
+        "service": "_immich._tcp",
+        "server_name": "Home Photos",
+        "txt": {
+          "path": "/api"
+        }
+      }
+    },
+    {
+      "name": "office-printer",
+      "local_port": 631,
+      "upstream_url": "http://cups.your-tailnet.ts.net:631",
+      "discovery": {
+        "type": "mdns",
+        "service": "_ipp._tcp",
+        "server_name": "Office Laser Printer",
+        "txt": {
+          "rp": "printers/OfficeLaser",
+          "pdl": "application/pdf,image/urf"
+        }
+      }
     }
   ]
 }

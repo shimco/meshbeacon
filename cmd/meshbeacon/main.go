@@ -32,6 +32,7 @@ func main() {
 		advertiseHost    = flag.String("advertise-host", getEnv("ADVERTISE_HOST", "auto"), "Local host/IP advertised to LAN clients ('auto' to detect)")
 		upstreamJellyfin = flag.String("jellyfin", getEnv("UPSTREAM_JELLYFIN", ""), "Upstream Jellyfin URL (e.g. http://mediaserver:8096)")
 		upstreamPlex     = flag.String("plex", getEnv("UPSTREAM_PLEX", ""), "Upstream Plex URL (e.g. http://mediaserver:32400)")
+		upstreamImmich   = flag.String("immich", getEnv("UPSTREAM_IMMICH", ""), "Upstream Immich URL (e.g. http://mediaserver:2283)")
 		cacheRAM         = flag.String("cache-ram", getEnv("CACHE_RAM", "auto"), "Asset cache RAM size ('auto', '64MB', 'off')")
 		cacheDir         = flag.String("cache-dir", getEnv("CACHE_DIR", ""), "Optional persistent disk cache directory (default off)")
 		cacheDisk        = flag.String("cache-disk-size", getEnv("CACHE_DISK_SIZE", "auto"), "Max disk cache size if cache-dir is enabled ('auto', '2GB')")
@@ -48,7 +49,7 @@ func main() {
 			log.Fatalf("Failed to load config: %v", err)
 		}
 	} else {
-		cfg = config.DefaultConfig(*advertiseHost, *upstreamJellyfin, *upstreamPlex)
+		cfg = config.DefaultConfig(*advertiseHost, *upstreamJellyfin, *upstreamPlex, *upstreamImmich)
 	}
 
 	// 2. Resolve Advertised LAN Address Dynamically if "auto" or empty
@@ -197,6 +198,29 @@ func main() {
 			beacons = append(beacons, discovery.NewPlexGDMBeacon(svc.Discovery.Port, svc.Discovery.ServerName, svc.LocalPort, svc.Discovery.ServerID))
 			// mDNS / Bonjour Announcer (_plexmediasvr._tcp)
 			beacons = append(beacons, discovery.NewMDNSBeacon(svc.Discovery.ServerName, "_plexmediasvr._tcp", svc.LocalPort, []string{"Resource-Identifier=" + svc.Discovery.ServerID}))
+
+		case "immich":
+			serviceType := svc.Discovery.NormalizeServiceType("_immich._tcp")
+			displayName := svc.Discovery.ServerName
+			if displayName == "" {
+				displayName = "Immich"
+			}
+			if svc.Discovery.TXT == nil {
+				svc.Discovery.TXT = map[string]string{"path": "/api"}
+			} else if _, ok := svc.Discovery.TXT["path"]; !ok {
+				svc.Discovery.TXT["path"] = "/api"
+			}
+			txt := svc.Discovery.FormattedTXT()
+			beacons = append(beacons, discovery.NewMDNSBeacon(displayName, serviceType, svc.LocalPort, txt))
+
+		case "mdns", "generic":
+			serviceType := svc.Discovery.NormalizeServiceType(svc.Name)
+			displayName := svc.Discovery.ServerName
+			if displayName == "" {
+				displayName = svc.Name
+			}
+			txt := svc.Discovery.FormattedTXT()
+			beacons = append(beacons, discovery.NewMDNSBeacon(displayName, serviceType, svc.LocalPort, txt))
 
 		default:
 			continue
