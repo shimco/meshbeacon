@@ -19,6 +19,8 @@ import (
 	"github.com/shimco/meshbeacon/internal/proxy"
 )
 
+var version = "v0.8.0"
+
 func getEnv(key, defaultVal string) string {
 	if val := os.Getenv(key); val != "" {
 		return val
@@ -37,8 +39,14 @@ func main() {
 		cacheDir         = flag.String("cache-dir", getEnv("CACHE_DIR", ""), "Optional persistent disk cache directory (default off)")
 		cacheDisk        = flag.String("cache-disk-size", getEnv("CACHE_DISK_SIZE", "auto"), "Max disk cache size if cache-dir is enabled ('auto', '2GB')")
 		healthCheck      = flag.Bool("health-check", false, "Run health check against configured services and exit")
+		showVersion      = flag.Bool("version", false, "Print Meshbeacon version and exit")
 	)
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("meshbeacon %s\n", version)
+		os.Exit(0)
+	}
 
 	// 1. Load Configuration
 	var cfg *config.Config
@@ -52,7 +60,19 @@ func main() {
 		cfg = config.DefaultConfig(*advertiseHost, *upstreamJellyfin, *upstreamPlex, *upstreamImmich)
 	}
 
-	// 2. Resolve Advertised LAN Address Dynamically if "auto" or empty
+	// 2. Validate That At Least One Service Is Configured (unless in healthcheck mode)
+	if !*healthCheck && len(cfg.Services) == 0 {
+		fmt.Fprintf(os.Stderr, "🗼 Meshbeacon %s - Local LAN Media Gateway & Autodiscovery\n\n", version)
+		fmt.Fprintf(os.Stderr, "Error: No upstream services configured.\n\n")
+		fmt.Fprintf(os.Stderr, "Quickstart Examples:\n")
+		fmt.Fprintf(os.Stderr, "  meshbeacon -jellyfin http://<server-ip>:8096\n")
+		fmt.Fprintf(os.Stderr, "  meshbeacon -plex http://<server-ip>:32400\n")
+		fmt.Fprintf(os.Stderr, "  meshbeacon -config /etc/meshbeacon/meshbeacon.json\n\n")
+		fmt.Fprintf(os.Stderr, "Run 'meshbeacon --help' for all command-line options.\n")
+		os.Exit(1)
+	}
+
+	// 3. Resolve Advertised LAN Address Dynamically if "auto" or empty
 	resolvedAddr, err := netutil.NormalizeHost(cfg.AdvertiseAddr)
 	if err != nil {
 		log.Printf("[Warning] Could not auto-detect LAN IP: %v. Using %s", err, cfg.AdvertiseAddr)
@@ -60,7 +80,7 @@ func main() {
 		cfg.AdvertiseAddr = resolvedAddr
 	}
 
-	// 3. Health Check Mode (Used by Docker HEALTHCHECK & autoheal)
+	// 4. Health Check Mode (Used by Docker HEALTHCHECK & autoheal)
 	if *healthCheck {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -73,7 +93,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	log.Println("🗼 Meshbeacon - Local LAN Media Gateway & Autodiscovery")
+	log.Printf("🗼 Meshbeacon %s - Local LAN Media Gateway & Autodiscovery", version)
 	log.Printf("Advertising LAN Host: %s (%d services configured)", cfg.AdvertiseAddr, len(cfg.Services))
 
 	// 4. Setup Context with Signal Cancellation

@@ -56,7 +56,9 @@ jobs:
           GOMIPS: ${{ matrix.gomips }}
           CGO_ENABLED: 0
         run: |
-          go build -v -ldflags="-s -w" -o meshbeacon ./cmd/meshbeacon
+          go build -v \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o meshbeacon ./cmd/meshbeacon
           tar -czf ${{ matrix.archive_name }}.tar.gz \
             meshbeacon meshbeacon.example.json LICENSE
 

@@ -218,7 +218,7 @@ meshbeacon
 * **Static LAN IP / DHCP Reservation (Recommended for Family Setups):**
   - While Meshbeacon dynamically adapts and broadcasts whatever LAN IP it currently holds, **Smart TV apps (LG webOS, Samsung Tizen, Android TV, Apple TV) cache the server's IP address locally once connected**.
   - If the Raspberry Pi or host machine reboots and receives a different DHCP IP from the router, the TV app will attempt to reconnect to the stale IP address, displaying a temporary "Server Unreachable" prompt until manually selected again.
-  - **Frictionless Fix:** Assign a **DHCP reservation** (or static IP) to your Raspberry Pi or host device in your home router's admin settings. This ensures zero family support friction and instant, continuous reconnects from standby.
+  - **Frictionless Fix:** Assign a **DHCP reservation** (or static IP) to your Raspberry Pi or host device in your home router's admin settings. This reduces support nagging and should keep the connection stable.
 * **Wi-Fi Multicast / AP Isolation:**
   - If your TV is on Wi-Fi and Meshbeacon is on Ethernet, verify that **"Wireless Multicast Forwarding (WMF)"** or **"IGMP Snooping"** is enabled in your router settings, and **"AP Isolation"** is disabled.
   - If discovery is blocked by an aggressive router, entering `http://<meshbeacon-lan-ip>:8096` directly into the TV app always connects immediately through the streaming proxy.
