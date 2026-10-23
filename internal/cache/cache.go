@@ -269,18 +269,22 @@ func CacheKey(service, path, rawQuery string) string {
 	return service + ":" + path
 }
 
-// Get queries RAM first, then Disk. If found on Disk, it is promoted to RAM.
+// Get queries RAM first, then Disk. If found on Disk, it is promoted to RAM (if RAM cache is active).
 func (c *DualTierCache) Get(key string) (*Item, bool) {
-	// 1. Check L1: Memory LRU
-	if item, ok := c.ram.Get(key); ok {
-		atomic.AddInt64(&c.hits, 1)
-		return item, true
+	// 1. Check L1: Memory LRU (if enabled)
+	if c.ram != nil && c.ram.maxBytes > 0 {
+		if item, ok := c.ram.Get(key); ok {
+			atomic.AddInt64(&c.hits, 1)
+			return item, true
+		}
 	}
 
 	// 2. Check L2: Disk Tier (if enabled)
 	if c.disk != nil {
 		if item, ok := c.disk.Get(key); ok {
-			c.ram.Set(item) // Promote back into RAM
+			if c.ram != nil && c.ram.maxBytes > 0 {
+				c.ram.Set(item) // Promote back into RAM
+			}
 			atomic.AddInt64(&c.hits, 1)
 			return item, true
 		}
@@ -290,7 +294,7 @@ func (c *DualTierCache) Get(key string) (*Item, bool) {
 	return nil, false
 }
 
-// Set stores an asset in RAM (and Disk if configured).
+// Set stores an asset in RAM (if enabled) and Disk (if configured).
 func (c *DualTierCache) Set(key string, data []byte, contentType, etag string) {
 	item := &Item{
 		Key:         key,
@@ -301,7 +305,9 @@ func (c *DualTierCache) Set(key string, data []byte, contentType, etag string) {
 		ExpiresAt:   time.Now().Add(c.ttl),
 	}
 
-	c.ram.Set(item)
+	if c.ram != nil && c.ram.maxBytes > 0 {
+		c.ram.Set(item)
+	}
 
 	if c.disk != nil {
 		go c.disk.Set(item)

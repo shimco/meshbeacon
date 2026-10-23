@@ -113,33 +113,47 @@ func main() {
 
 	// 5. Initialize Dual-Tier Asset Cache
 	var assetCache *cache.DualTierCache
-	if cfg.Cache.Enabled && cfg.Cache.RAMSize != "off" && cfg.Cache.RAMSize != "0" {
+	if cfg.Cache.Enabled {
+		hasDisk := cfg.Cache.DiskDir != ""
+		var diskBytes int64
+		if hasDisk {
+			autoDisk := int64(2 * 1024 * 1024 * 1024) // 2GB default
+			diskBytes, _ = cache.ParseSize(cfg.Cache.DiskSize, autoDisk)
+		}
+
 		totalRAM := cache.DetectTotalRAM()
-		autoRAM := cache.CalculateAutoRAMCacheSize(totalRAM)
+		var autoRAM int64
+		if hasDisk {
+			autoRAM = cache.CalculateAutoRAMCacheSizeWithDisk(totalRAM)
+		} else {
+			autoRAM = cache.CalculateAutoRAMCacheSize(totalRAM)
+		}
+
 		ramBytes, err := cache.ParseSize(cfg.Cache.RAMSize, autoRAM)
 		if err != nil {
 			log.Printf("[Cache Warning] Invalid RAM size %q: %v. Using auto (%s)", cfg.Cache.RAMSize, err, cache.FormatSize(autoRAM))
 			ramBytes = autoRAM
 		}
 
-		var diskBytes int64
-		if cfg.Cache.DiskDir != "" {
-			autoDisk := int64(2 * 1024 * 1024 * 1024) // 2GB default
-			diskBytes, _ = cache.ParseSize(cfg.Cache.DiskSize, autoDisk)
-		}
-
-		ttl := 30 * 24 * time.Hour
-
-		assetCache, err = cache.NewDualTierCache(ramBytes, cfg.Cache.DiskDir, diskBytes, ttl)
-		if err != nil {
-			log.Printf("[Cache Warning] Failed to initialize cache: %v", err)
-		} else {
-			diskInfo := "disabled"
-			if cfg.Cache.DiskDir != "" && diskBytes > 0 {
-				diskInfo = fmt.Sprintf("%s at %s", cache.FormatSize(diskBytes), cfg.Cache.DiskDir)
+		if ramBytes > 0 || (hasDisk && diskBytes > 0) {
+			ttl := 30 * 24 * time.Hour
+			assetCache, err = cache.NewDualTierCache(ramBytes, cfg.Cache.DiskDir, diskBytes, ttl)
+			if err != nil {
+				log.Printf("[Cache Warning] Failed to initialize cache: %v", err)
+			} else {
+				ramDesc := cache.FormatSize(ramBytes)
+				if ramBytes == 0 {
+					ramDesc = "disabled (pure disk)"
+				}
+				diskDesc := "disabled"
+				if hasDisk && diskBytes > 0 {
+					diskDesc = fmt.Sprintf("%s at %s", cache.FormatSize(diskBytes), cfg.Cache.DiskDir)
+				}
+				log.Printf("[Asset Cache] Active: RAM=%s (host RAM %s), Disk=%s, TTL=30d",
+					ramDesc, cache.FormatSize(totalRAM), diskDesc)
 			}
-			log.Printf("[Asset Cache] Active: RAM=%s (host RAM %s), Disk=%s, TTL=30d",
-				cache.FormatSize(ramBytes), cache.FormatSize(totalRAM), diskInfo)
+		} else {
+			log.Println("[Asset Cache] Disabled (RAM and Disk are off)")
 		}
 	} else {
 		log.Println("[Asset Cache] Disabled")

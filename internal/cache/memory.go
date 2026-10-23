@@ -42,6 +42,16 @@ func CalculateAutoRAMCacheSize(totalRAM int64) int64 {
 	}
 }
 
+// CalculateAutoRAMCacheSizeWithDisk returns a lightweight hot-buffer budget (capped at 64MB)
+// when secondary persistent disk caching is enabled, saving host RAM.
+func CalculateAutoRAMCacheSizeWithDisk(totalRAM int64) int64 {
+	base := CalculateAutoRAMCacheSize(totalRAM)
+	if base > 64*MB {
+		return 64 * MB
+	}
+	return base
+}
+
 // ParseSize converts a user size string (e.g. "auto", "64MB", "2GB", "off") to bytes.
 func ParseSize(str string, autoSize int64) (int64, error) {
 	s := strings.TrimSpace(strings.ToLower(str))

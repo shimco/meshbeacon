@@ -299,14 +299,20 @@ Rather than a flat percentage that starves micro-routers or wastes gigabytes on 
 > [!TIP]
 > **Zero Flash & SD-Card Wear:** By default, caching operates 100% in-memory (`RAM LRU`). Meshbeacon **never** writes temporary cache files to the internal filesystem on OpenWrt routers (protecting 16MB SPI flash from filling up) or Raspberry Pis (protecting MicroSD cards from write wear).
  
-### Optional Secondary Disk Tier
-If you run Meshbeacon on a homelab server, mini-PC, or router with an external USB SSD/NVMe drive, pass `-cache-dir` to enable secondary disk caching:
- 
+### Secondary Disk Tier (SSD / NVMe / Persistent Disk)
+
+If you run Meshbeacon on a homelab server, mini-PC, or NAS with an SSD or NVMe drive, configure `disk_dir` to store gigabytes of artwork permanently across reboots:
+
 ```bash
-# Store up to 10GB of posters permanently across reboots on SSD
-meshbeacon -cache-ram 256MB -cache-dir /mnt/ssd/meshbeacon -cache-disk-size 10GB
+# 1. Balanced Mode (Default "auto" when disk is enabled):
+# Automatically caps RAM to a lightweight 64MB hot-buffer and stores up to 10GB on SSD
+meshbeacon -cache-dir /mnt/nvme/meshbeacon -cache-disk-size 10GB
+
+# 2. Pure NVMe Disk Only (0 MB RAM used for images):
+# Reads 100% of cached assets directly from NVMe, dropping base RAM to ~4MB
+meshbeacon -cache-ram off -cache-dir /mnt/nvme/meshbeacon -cache-disk-size 2GB
 ```
- 
+
 Or in `meshbeacon.json`:
 ```json
 {
@@ -314,12 +320,18 @@ Or in `meshbeacon.json`:
     "enabled": true,
     "ram_size": "auto",
     "disk_dir": "/var/cache/meshbeacon",
-    "disk_size": "5GB",
+    "disk_size": "2GB",
     "ttl": "30d"
   }
 }
 ```
- 
+
+> [!NOTE]
+> **Intelligent "Auto" Downscaling with Disk:**
+> * When `disk_dir` is **disabled**: `ram_size: "auto"` uses your full hardware bracket (up to 512MB on servers) to guard remote WAN mesh bandwidth.
+> * When `disk_dir` is **enabled**: `ram_size: "auto"` automatically drops down to a **64MB hot-buffer** (~1,500 posters) for the active TV season, saving ~450MB of host RAM while letting the SSD handle your complete multi-gigabyte library.
+> * Set `ram_size: "off"` for **Pure Disk Mode** if you want zero image data stored in RAM. On modern NVMe SSDs (read latency ~0.02ms), local Wi-Fi latency (2–10ms) is the only limiting factor.
+
 *(Video streaming chunks `.ts`, `.m3u8`, and Range requests bypass the cache entirely and stream directly through the zero-allocation 32KB buffer pool).*
  
 ---

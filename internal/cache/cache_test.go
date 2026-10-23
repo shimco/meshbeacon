@@ -137,6 +137,30 @@ func TestIsCacheableAsset(t *testing.T) {
 	}
 }
 
+func TestCalculateAutoRAMCacheSizeWithDisk(t *testing.T) {
+	tests := []struct {
+		ram      int64
+		expected int64
+	}{
+		{ram: 64 * MB, expected: 8 * MB},
+		{ram: 128 * MB, expected: 8 * MB},
+		{ram: 256 * MB, expected: 32 * MB},
+		{ram: 512 * MB, expected: 32 * MB},
+		{ram: 1 * GB, expected: 64 * MB},  // Capped at 64MB hot buffer
+		{ram: 2 * GB, expected: 64 * MB},  // Capped at 64MB hot buffer
+		{ram: 4 * GB, expected: 64 * MB},  // Capped at 64MB hot buffer
+		{ram: 16 * GB, expected: 64 * MB}, // Capped at 64MB hot buffer
+	}
+
+	for _, tc := range tests {
+		actual := CalculateAutoRAMCacheSizeWithDisk(tc.ram)
+		if actual != tc.expected {
+			t.Errorf("For RAM %s with disk, expected cache size %s, got %s",
+				FormatSize(tc.ram), FormatSize(tc.expected), FormatSize(actual))
+		}
+	}
+}
+
 func TestDualTierCache(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "meshbeacon_cache_test_*")
 	if err != nil {
@@ -168,5 +192,50 @@ func TestDualTierCache(t *testing.T) {
 	stats := c.Stats()
 	if stats.Hits != 1 {
 		t.Errorf("expected 1 hit, got %d", stats.Hits)
+	}
+}
+
+func TestPureDiskCache(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "meshbeacon_puredisk_test_*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Initialize with 0 RAM bytes (pure disk mode)
+	c, err := NewDualTierCache(0, tempDir, 500*MB, 1*time.Hour)
+	if err != nil {
+		t.Fatalf("failed to create pure disk cache: %v", err)
+	}
+
+	key := CacheKey("plex", "/photo/:/transcode", "width=400")
+	testData := []byte("fake_plex_poster_png")
+	c.Set(key, testData, "image/png", "etag456")
+
+	// Allow goroutine async disk write to settle
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify RAM is completely empty
+	stats := c.Stats()
+	if stats.RAMBytes != 0 || stats.RAMItems != 0 {
+		t.Errorf("expected 0 RAM items in pure disk mode, got %d items (%d bytes)", stats.RAMItems, stats.RAMBytes)
+	}
+
+	// Retrieve item - should hit disk
+	item, ok := c.Get(key)
+	if !ok {
+		t.Fatalf("expected cache HIT from disk")
+	}
+	if !bytes.Equal(item.Data, testData) {
+		t.Errorf("data mismatch: expected %q, got %q", testData, item.Data)
+	}
+
+	// Verify no promotion into RAM occurred
+	statsAfter := c.Stats()
+	if statsAfter.RAMBytes != 0 || statsAfter.RAMItems != 0 {
+		t.Errorf("item was unexpectedly promoted into RAM: %d items (%d bytes)", statsAfter.RAMItems, statsAfter.RAMBytes)
+	}
+	if statsAfter.Hits != 1 {
+		t.Errorf("expected 1 hit, got %d", statsAfter.Hits)
 	}
 }
