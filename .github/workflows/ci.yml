@@ -1,10 +1,11 @@
+---
 name: CI & Multi-Arch Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
@@ -31,5 +32,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          go mod tidy
-          go build -v -ldflags="-s -w" -o meshbeacon-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/meshbeacon
+          go test -v ./...
+          go build -v -ldflags="-s -w" \
+            -o meshbeacon-${{ matrix.goos }}-${{ matrix.goarch }} \
+            ./cmd/meshbeacon
