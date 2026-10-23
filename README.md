@@ -11,7 +11,7 @@
 [![Binary Size](https://img.shields.io/badge/Binary-<7MB-success.svg)](https://github.com/shimco/meshbeacon/releases)
 
 > [!IMPORTANT]
-> **Project Status: Public Beta (v0.6)**  
+> **Project Status: Public Beta (v0.8)**  
 > Meshbeacon is actively being tested across diverse homelab setups. It has been validated in production with **Jellyfin on Docker** streaming to **Google TV and Android TV**.  
 > Plex, Immich, Audiobookshelf, and OpenWrt travel router builds are currently in active community testing. **If you encounter discovery quirks with specific smart TVs or router setups, please open a [GitHub Issue](https://github.com/shimco/meshbeacon/issues)—your feedback directly drives the roadmap!**
 
@@ -214,9 +214,9 @@ sudo systemctl restart meshbeacon
 
 ---
 
-### Option D: Turnkey POSIX Installer (Raspberry Pi / Linux / OpenWrt)
+### Option D: The YOLO One-Liner (curl | sh)
 
-Automatically detects your OS and CPU architecture (x86_64, ARM64, ARMv7, MIPS), verifies SHA-256 checksums, downloads the release binary, and configures either **OpenWrt procd** or **Linux systemd**:
+For when you just want it running *right now*. Automatically detects your CPU architecture (x86_64, ARM64, ARMv7, MIPS), verifies SHA-256 checksums against official releases, drops in the binary, and wires up either **OpenWrt procd** or **Linux systemd**:
 
 ```bash
 # Install or upgrade to latest release
