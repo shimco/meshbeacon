@@ -1,36 +1,42 @@
 ---
-name: Release Binaries
+name: Release Multi-Arch Binaries
 
-"on":
+on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-release:
-    name: Build & Release Binaries
+  build:
+    name: Build Release Binaries
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - goos: linux
             goarch: amd64
-            goarm: ''
+            archive_name: meshbeacon_linux_amd64
           - goos: linux
             goarch: arm64
-            goarm: ''
+            archive_name: meshbeacon_linux_arm64
           - goos: linux
             goarch: arm
             goarm: '7'
+            archive_name: meshbeacon_linux_armv7
+          - goos: linux
+            goarch: mipsle
+            gomips: softfloat
+            archive_name: meshbeacon_linux_mipsle
           - goos: darwin
             goarch: amd64
-            goarm: ''
+            archive_name: meshbeacon_darwin_amd64
           - goos: darwin
             goarch: arm64
-            goarm: ''
+            archive_name: meshbeacon_darwin_arm64
 
     steps:
       - name: Checkout Code
@@ -43,57 +49,50 @@ jobs:
           cache: true
 
       - name: Build Binary
-        id: build
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           GOARM: ${{ matrix.goarm }}
+          GOMIPS: ${{ matrix.gomips }}
           CGO_ENABLED: 0
         run: |
-          ARM_SFX=""
-          if [ -n "${{ matrix.goarm }}" ]; then
-            ARM_SFX="v${{ matrix.goarm }}"
-          fi
-          SUFFIX="${{ matrix.goos }}-${{ matrix.goarch }}${ARM_SFX}"
-          BIN_NAME="meshbeacon"
-          DIST_DIR="dist/meshbeacon-${{ github.ref_name }}-${SUFFIX}"
-          mkdir -p "${DIST_DIR}"
-
-          go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
-            -o "${DIST_DIR}/${BIN_NAME}" ./cmd/meshbeacon
-          cp README.md LICENSE meshbeacon.example.json "${DIST_DIR}/"
-
-          TAR_NAME="meshbeacon-${{ github.ref_name }}-${SUFFIX}.tar.gz"
-          tar -czf "dist/${TAR_NAME}" -C dist \
-            "meshbeacon-${{ github.ref_name }}-${SUFFIX}"
-          echo "tar_name=${TAR_NAME}" >> "$GITHUB_OUTPUT"
+          go build -v -ldflags="-s -w" -o meshbeacon ./cmd/meshbeacon
+          tar -czf ${{ matrix.archive_name }}.tar.gz \
+            meshbeacon meshbeacon.example.json LICENSE
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.build.outputs.tar_name }}
-          path: dist/${{ steps.build.outputs.tar_name }}
+          name: ${{ matrix.archive_name }}
+          path: ${{ matrix.archive_name }}.tar.gz
+          retention-days: 1
 
-  publish-release:
+  publish:
     name: Publish GitHub Release
-    needs: build-release
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download all built artifacts
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
-          path: release-artifacts
+          path: dist/
           merge-multiple: true
 
       - name: Generate Checksums
-        working-directory: release-artifacts
         run: |
-          sha256sum meshbeacon-*.tar.gz > checksums.txt
+          cd dist
+          sha256sum meshbeacon_*.tar.gz > checksums.txt
+          cat checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-artifacts/*
+          files: |
+            dist/*.tar.gz
+            dist/checksums.txt
           generate_release_notes: true
           draft: false
           prerelease: false
