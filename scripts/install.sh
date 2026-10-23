@@ -20,8 +20,8 @@
 set -eu
 
 REPO="shimco/meshbeacon"
-INSTALL_DIR_LINUX="/usr/local/bin"
-INSTALL_DIR_OPENWRT="/usr/bin"
+INSTALL_DIR_LINUX="${DEST_DIR:-/usr/local/bin}"
+INSTALL_DIR_OPENWRT="${DEST_DIR:-/usr/bin}"
 CONFIG_DIR="/etc/meshbeacon"
 
 log() {
@@ -72,7 +72,11 @@ uninstall() {
   for bin in "${INSTALL_DIR_LINUX}/meshbeacon" "${INSTALL_DIR_OPENWRT}/meshbeacon"; do
     if [ -f "${bin}" ]; then
       log "Removing binary: ${bin}"
-      run_as_root rm -f "${bin}"
+      if [ -w "${bin}" ] && [ -w "$(dirname "${bin}")" ]; then
+        rm -f "${bin}"
+      else
+        run_as_root rm -f "${bin}"
+      fi
     fi
   done
 
@@ -333,9 +337,22 @@ fi
 # ------------------------------------------------------------------------------
 if [ "${TARGET_OS}" = "darwin" ]; then
   DEST="${INSTALL_DIR_LINUX}/meshbeacon"
-  run_as_root mkdir -p "${INSTALL_DIR_LINUX}"
-  run_as_root mv "${TMP_DIR}/meshbeacon" "${DEST}"
+  TARGET_DIR="$(dirname "${DEST}")"
+  IS_WRITABLE=0
+  if [ -w "${TARGET_DIR}" ] 2>/dev/null; then
+    IS_WRITABLE=1
+  elif [ ! -d "${TARGET_DIR}" ] && [ -w "$(dirname "${TARGET_DIR}")" ] 2>/dev/null; then
+    IS_WRITABLE=1
+  fi
+
+  if [ "${IS_WRITABLE}" = "1" ]; then
+    mkdir -p "${INSTALL_DIR_LINUX}"
+    mv "${TMP_DIR}/meshbeacon" "${DEST}"
+  else
+    run_as_root mkdir -p "${INSTALL_DIR_LINUX}"
+    run_as_root mv "${TMP_DIR}/meshbeacon" "${DEST}"
+  fi
   log "Installed Meshbeacon to ${DEST}"
-  log "Run 'meshbeacon --help' or start with: meshbeacon -jellyfin http://<server>:8096"
+  log "Run '${DEST} --help' or start with: ${DEST} -jellyfin http://<server>:8096"
   exit 0
 fi
