@@ -1,0 +1,27 @@
+---
+# ==============================================================================
+# GitHub Automated Release Notes Configuration
+# ==============================================================================
+changelog:
+  categories:
+    - title: "✨ Features & Enhancements"
+      labels:
+        - "feature"
+        - "enhancement"
+    - title: "🐛 Bug Fixes & Stability"
+      labels:
+        - "bug"
+        - "fix"
+    - title: "⚡ Performance & Caching"
+      labels:
+        - "performance"
+        - "cache"
+    - title: "📖 Documentation & Guides"
+      labels:
+        - "documentation"
+        - "docs"
+    - title: "🧰 Maintenance & CI"
+      labels:
+        - "maintenance"
+        - "ci"
+        - "dependencies"
