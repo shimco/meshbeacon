@@ -8,8 +8,25 @@ on:
     branches: [main]
 
 jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Run Tests
+        run: go test -v ./...
+
   build:
-    name: Build & Verify
+    name: Cross-Compile Binaries
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -32,7 +49,6 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          go test -v ./...
           go build -v -ldflags="-s -w" \
             -o meshbeacon-${{ matrix.goos }}-${{ matrix.goarch }} \
             ./cmd/meshbeacon
