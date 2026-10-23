@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/shimco/meshbeacon/internal/cache"
 	"github.com/shimco/meshbeacon/internal/config"
 	"github.com/shimco/meshbeacon/internal/discovery"
 	"github.com/shimco/meshbeacon/internal/health"
@@ -31,6 +32,9 @@ func main() {
 		advertiseHost    = flag.String("advertise-host", getEnv("ADVERTISE_HOST", "auto"), "Local host/IP advertised to LAN clients ('auto' to detect)")
 		upstreamJellyfin = flag.String("jellyfin", getEnv("UPSTREAM_JELLYFIN", ""), "Upstream Jellyfin URL (e.g. http://mediaserver:8096)")
 		upstreamPlex     = flag.String("plex", getEnv("UPSTREAM_PLEX", ""), "Upstream Plex URL (e.g. http://mediaserver:32400)")
+		cacheRAM         = flag.String("cache-ram", getEnv("CACHE_RAM", "auto"), "Asset cache RAM size ('auto', '64MB', 'off')")
+		cacheDir         = flag.String("cache-dir", getEnv("CACHE_DIR", ""), "Optional persistent disk cache directory (default off)")
+		cacheDisk        = flag.String("cache-disk-size", getEnv("CACHE_DISK_SIZE", "auto"), "Max disk cache size if cache-dir is enabled ('auto', '2GB')")
 		healthCheck      = flag.Bool("health-check", false, "Run health check against configured services and exit")
 	)
 	flag.Parse()
@@ -75,10 +79,55 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	// Apply CLI flag overrides to cache config
+	if *cacheRAM != "auto" || cfg.Cache.RAMSize == "" {
+		cfg.Cache.RAMSize = *cacheRAM
+	}
+	if *cacheDir != "" {
+		cfg.Cache.DiskDir = *cacheDir
+	}
+	if *cacheDisk != "auto" || cfg.Cache.DiskSize == "" {
+		cfg.Cache.DiskSize = *cacheDisk
+	}
+
+	// 5. Initialize Dual-Tier Asset Cache
+	var assetCache *cache.DualTierCache
+	if cfg.Cache.Enabled && cfg.Cache.RAMSize != "off" && cfg.Cache.RAMSize != "0" {
+		totalRAM := cache.DetectTotalRAM()
+		autoRAM := cache.CalculateAutoRAMCacheSize(totalRAM)
+		ramBytes, err := cache.ParseSize(cfg.Cache.RAMSize, autoRAM)
+		if err != nil {
+			log.Printf("[Cache Warning] Invalid RAM size %q: %v. Using auto (%s)", cfg.Cache.RAMSize, err, cache.FormatSize(autoRAM))
+			ramBytes = autoRAM
+		}
+
+		var diskBytes int64
+		if cfg.Cache.DiskDir != "" {
+			autoDisk := int64(2 * 1024 * 1024 * 1024) // 2GB default
+			diskBytes, _ = cache.ParseSize(cfg.Cache.DiskSize, autoDisk)
+		}
+
+		ttl := 30 * 24 * time.Hour
+
+		assetCache, err = cache.NewDualTierCache(ramBytes, cfg.Cache.DiskDir, diskBytes, ttl)
+		if err != nil {
+			log.Printf("[Cache Warning] Failed to initialize cache: %v", err)
+		} else {
+			diskInfo := "disabled"
+			if cfg.Cache.DiskDir != "" && diskBytes > 0 {
+				diskInfo = fmt.Sprintf("%s at %s", cache.FormatSize(diskBytes), cfg.Cache.DiskDir)
+			}
+			log.Printf("[Asset Cache] Active: RAM=%s (host RAM %s), Disk=%s, TTL=30d",
+				cache.FormatSize(ramBytes), cache.FormatSize(totalRAM), diskInfo)
+		}
+	} else {
+		log.Println("[Asset Cache] Disabled")
+	}
+
 	var wg sync.WaitGroup
 
-	// 5. Start Multi-Service HTTP Streaming Gateway
-	gw, err := proxy.NewGateway(cfg.Services)
+	// 6. Start Multi-Service HTTP Streaming Gateway
+	gw, err := proxy.NewGateway(cfg.Services, assetCache)
 	if err != nil {
 		log.Fatalf("Failed to initialize gateway: %v", err)
 	}

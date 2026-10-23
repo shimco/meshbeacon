@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shimco/meshbeacon/internal/cache"
 	"github.com/shimco/meshbeacon/internal/config"
 )
 
@@ -16,18 +17,20 @@ type Gateway struct {
 	services []config.ServiceConfig
 	servers  []*http.Server
 	proxies  []*StreamProxy
+	cache    *cache.DualTierCache
 }
 
 // NewGateway creates a gateway from service configs.
-func NewGateway(services []config.ServiceConfig) (*Gateway, error) {
+func NewGateway(services []config.ServiceConfig, assetCache *cache.DualTierCache) (*Gateway, error) {
 	gw := &Gateway{
 		services: services,
 		servers:  make([]*http.Server, 0, len(services)),
 		proxies:  make([]*StreamProxy, 0, len(services)),
+		cache:    assetCache,
 	}
 
 	for _, svc := range services {
-		rp, err := NewStreamProxy(svc.Name, svc.UpstreamURL)
+		rp, err := NewStreamProxy(svc.Name, svc.UpstreamURL, assetCache)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize proxy for %s (%s): %w", svc.Name, svc.UpstreamURL, err)
 		}

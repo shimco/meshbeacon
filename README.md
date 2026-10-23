@@ -99,9 +99,9 @@ Meshbeacon bridges your remote media server into your local home Wi-Fi:
   - 🥧 **ARM Single-Board Computers:** Raspberry Pi Zero 2W / 3 / 4 / 5, Orange Pi, Rockchip RK3588.
   - ⚡ **Next-Gen RISC-V:** Native `linux/riscv64` (VisionFive 2, Milk-V, SpacemiT).
   - 💻 **x86_64:** Intel N100 mini-PCs, Proxmox, TrueNAS, unRAID, OPNsense/pfSense.
+- [x] **Dual-Tier Asset Caching:** High-speed in-memory LRU cache with hardware-bracketed auto-scaling (8MB on 128MB routers to 512MB on servers) to eliminate SD card/flash wear, plus optional persistent SSD/disk tier for multi-gigabyte library caching.
 - [ ] **OpenWrt Native Service:** Lightweight `/etc/init.d/meshbeacon` procd service + UCI configuration (<3MB binary with UPX).
 - [ ] **Embedded Web GUI:** Modern, dark-mode configuration dashboard to toggle services, view active stream bitrates, and manage upstream routes.
-- [ ] **Dual-Tier Asset Caching:** Caches movie posters, episode thumbnails, and UI backdrops in **RAM LRU** by default (zero SD-card write wear for Raspberry Pis), with an optional persistent **SSD/NVMe/USB storage** tier for multi-gigabyte library caching.
 
 ---
 
@@ -206,34 +206,66 @@ meshbeacon
 ---
 
 ## 💾 Pragmatic Hardware & Asset Caching Strategy
-
-Media server posters and photo thumbnails are small (50KB–400KB), but loading 200 of them over a high-latency WAN mesh slows down TV interfaces. Meshbeacon is architected to handle caching safely across wildly different hardware profiles:
-
-| Hardware Profile | Default Caching Strategy | Why? |
-| :--- | :--- | :--- |
-| **OpenWrt Travel Routers** *(128MB–256MB RAM)* | **Conservative RAM (16MB–32MB) or Disabled** | Routers must never run out of memory for packet routing and firewall tables. Auto-detection keeps memory footprint minuscule (<10MB). |
-| **Raspberry Pi on Micro-SD** *(512MB–8GB RAM)* | **RAM LRU (64MB–128MB)** | Eliminates **micro-SD card flash wear** by keeping all thumbnail caching strictly in RAM. Zero disk writes = zero burnt-out SD cards. |
-| **Mini-PCs, Servers, & NVMe USB Storage** | **Persistent Disk / Volume Mount** | Pass a Docker volume (`-v ./cache:/var/cache/meshbeacon`) and configure `max_gb: 10` to store gigabytes of posters and thumbnails permanently across reboots. |
-
-*(All cache limits and storage targets will be adjustable in real-time via the upcoming Web GUI).*
-
+ 
+Media server posters and photo thumbnails are small (30KB–150KB), but requesting hundreds of them across a high-latency WAN mesh tunnel slows down Smart TV interfaces. Meshbeacon intercepts artwork queries (`/Items/{id}/Images/*` for Jellyfin and `/photo/:/transcode` for Plex), serving hits instantly from local memory.
+ 
+### Hardware-Bracketed "Auto" Memory Allocation
+ 
+Rather than a flat percentage that starves micro-routers or wastes gigabytes on home servers, Meshbeacon auto-detects total system RAM on startup and selects a sensible hardware-tailored bracket:
+ 
+| Total System RAM | Target Hardware Profile | Auto RAM Cache | Approx Capacity (~40KB/poster) | User Experience |
+| :--- | :--- | :--- | :--- | :--- |
+| **$\le$ 128 MB** | GL.iNet Mango / micro-routers | **8 MB** | ~200 posters | Instant home rows (Continue Watching / Next Up) without starving router OS |
+| **$\le$ 512 MB** | Pi Zero 2W / Beryl AX | **32 MB** | ~800 posters | Fluid scrolling through active TV seasons |
+| **$\le$ 1 GB** | Raspberry Pi 3 / basic SBCs | **96 MB** | ~2,500 posters | Entire typical movie/show library cached in RAM |
+| **$\le$ 2 GB** | Raspberry Pi 4 (2GB) | **192 MB** | ~4,800 posters | Full libraries + high-res episode thumbs |
+| **$\le$ 4 GB** | Pi 4 / 5 (4GB) | **256 MB** | ~6,500 posters | Deep libraries with actor portraits and fanart |
+| **$\gt$ 4 GB** | Homelabs / Mini-PCs / Workstations | **512 MB** | ~13,000+ posters | Zero disk/mesh queries ever during browsing |
+ 
+> [!TIP]
+> **Zero Flash & SD-Card Wear:** By default, caching operates 100% in-memory (`RAM LRU`). Meshbeacon **never** writes temporary cache files to the internal filesystem on OpenWrt routers (protecting 16MB SPI flash from filling up) or Raspberry Pis (protecting MicroSD cards from write wear).
+ 
+### Optional Secondary Disk Tier
+If you run Meshbeacon on a homelab server, mini-PC, or router with an external USB SSD/NVMe drive, pass `-cache-dir` to enable secondary disk caching:
+ 
+```bash
+# Store up to 10GB of posters permanently across reboots on SSD
+meshbeacon -cache-ram 256MB -cache-dir /mnt/ssd/meshbeacon -cache-disk-size 10GB
+```
+ 
+Or in `meshbeacon.json`:
+```json
+{
+  "cache": {
+    "enabled": true,
+    "ram_size": "auto",
+    "disk_dir": "/var/cache/meshbeacon",
+    "disk_size": "5GB",
+    "ttl": "30d"
+  }
+}
+```
+ 
+*(Video streaming chunks `.ts`, `.m3u8`, and Range requests bypass the cache entirely and stream directly through the zero-allocation 32KB buffer pool).*
+ 
 ---
-
+ 
 ## 🗺️ Roadmap
-
+ 
 - [x] **v0.1:** Core Go streaming reverse proxy + zero-allocation `sync.Pool` buffer.
 - [x] **v0.2:** Jellyfin UDP 7359 active + passive multi-subnet autodiscovery.
 - [x] **v0.3:** Plex GDM UDP 32414 broadcast responder.
 - [x] **v0.4:** Multicast DNS (mDNS / Bonjour) for Apple TV (Swiftfin) and Infuse.
 - [x] **v0.5:** Automated Server ID & metadata detection from upstream servers.
 - [x] **v0.6:** Built-in CLI health checking for Docker autoheal / Watchtower.
-- [ ] **v0.7:** Immich mDNS photo sync profile (`_immich._tcp`) & digital photo frame support.
-- [ ] **v0.8:** Hardware-aware Dual-Tier Asset Caching (RAM LRU vs. persistent disk).
+- [x] **v0.7:** Hardware-aware Dual-Tier Asset Caching (RAM LRU vs. persistent disk).
+- [ ] **v0.8:** Immich mDNS photo sync profile (`_immich._tcp`) & digital photo frame support.
 - [ ] **v0.9:** Embedded Web GUI with dual-interface binding (local LAN + remote Mesh).
 - [ ] **v1.0:** Turnkey Raspberry Pi appliance installer script & OpenWrt procd package.
-
+ 
 ---
-
+ 
 ## 📄 License
-
+ 
 Distributed under the [MIT License](LICENSE). Copyright (c) 2026 Graham Shimmin.
+

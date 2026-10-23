@@ -1,6 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "advertise_addr": "auto",
+  "cache": {
+    "enabled": true,
+    "ram_size": "auto",
+    "disk_dir": "",
+    "disk_size": "auto",
+    "ttl": "30d"
+  },
   "services": [
     {
       "name": "jellyfin",

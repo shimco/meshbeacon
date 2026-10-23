@@ -19,9 +19,19 @@ type ServiceConfig struct {
 	} `json:"discovery"`
 }
 
+// CacheConfig defines the dual-tier asset caching settings.
+type CacheConfig struct {
+	Enabled  bool   `json:"enabled"`
+	RAMSize  string `json:"ram_size"`  // "auto", "64MB", "off"
+	DiskDir  string `json:"disk_dir"`  // "" (disabled), or path to directory
+	DiskSize string `json:"disk_size"` // "auto", "5GB"
+	TTL      string `json:"ttl"`       // "30d", "7d"
+}
+
 // Config represents the complete Meshbeacon runtime configuration.
 type Config struct {
 	AdvertiseAddr string          `json:"advertise_addr"` // e.g. "http://192.168.1.100" or "auto"
+	Cache         CacheConfig     `json:"cache"`
 	Services      []ServiceConfig `json:"services"`
 }
 
@@ -33,8 +43,20 @@ func LoadConfig(filePath string) (*Config, error) {
 	}
 
 	var cfg Config
+	// Defaults
+	cfg.Cache.Enabled = true
+	cfg.Cache.RAMSize = "auto"
+	cfg.Cache.TTL = "30d"
+
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("invalid json in config file: %w", err)
+	}
+
+	if cfg.Cache.RAMSize == "" {
+		cfg.Cache.RAMSize = "auto"
+	}
+	if cfg.Cache.TTL == "" {
+		cfg.Cache.TTL = "30d"
 	}
 
 	return &cfg, nil
@@ -44,7 +66,14 @@ func LoadConfig(filePath string) (*Config, error) {
 func DefaultConfig(advertiseHost string, upstreamJellyfin string, upstreamPlex string) *Config {
 	cfg := &Config{
 		AdvertiseAddr: advertiseHost,
-		Services:      make([]ServiceConfig, 0),
+		Cache: CacheConfig{
+			Enabled:  true,
+			RAMSize:  "auto",
+			DiskDir:  "",
+			DiskSize: "auto",
+			TTL:      "30d",
+		},
+		Services: make([]ServiceConfig, 0),
 	}
 
 	if upstreamJellyfin != "" {

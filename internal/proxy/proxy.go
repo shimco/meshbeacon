@@ -1,14 +1,18 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
+
+	"github.com/shimco/meshbeacon/internal/cache"
 )
 
 // bufferPool implements httputil.BufferPool using sync.Pool for zero-allocation streaming.
@@ -44,10 +48,11 @@ type StreamProxy struct {
 	name   string
 	target *url.URL
 	proxy  *httputil.ReverseProxy
+	cache  *cache.DualTierCache
 }
 
 // NewStreamProxy initializes a hardened reverse proxy pointing to the target URL.
-func NewStreamProxy(name, targetURL string) (*StreamProxy, error) {
+func NewStreamProxy(name, targetURL string, assetCache *cache.DualTierCache) (*StreamProxy, error) {
 	u, err := url.Parse(targetURL)
 	if err != nil {
 		return nil, err
@@ -92,11 +97,56 @@ func NewStreamProxy(name, targetURL string) (*StreamProxy, error) {
 		name:   name,
 		target: u,
 		proxy:  rp,
+		cache:  assetCache,
 	}, nil
 }
 
-// ServeHTTP implements http.Handler with basic latency and connection logging.
+// ServeHTTP handles incoming requests, serving static artwork from cache and streaming video through buffers.
 func (sp *StreamProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Intercept static artwork requests if caching is enabled
+	if sp.cache != nil && cache.IsCacheableAsset(sp.name, r.Method, r.URL.Path) {
+		cacheKey := cache.CacheKey(sp.name, r.URL.Path, r.URL.RawQuery)
+
+		// 1. Check Cache HIT
+		if item, ok := sp.cache.Get(cacheKey); ok {
+			// Conditional GET via ETag (304 Not Modified)
+			if match := r.Header.Get("If-None-Match"); match != "" && match == item.ETag {
+				w.Header().Set("X-Meshbeacon-Cache", "HIT")
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+
+			w.Header().Set("X-Meshbeacon-Cache", "HIT")
+			if item.ContentType != "" {
+				w.Header().Set("Content-Type", item.ContentType)
+			}
+			if item.ETag != "" {
+				w.Header().Set("ETag", item.ETag)
+			}
+			w.Header().Set("Cache-Control", "public, max-age=2592000") // 30 days
+			w.Header().Set("Content-Length", strconv.FormatInt(item.Size, 10))
+			_, _ = w.Write(item.Data)
+			return
+		}
+
+		// 2. Cache MISS: stream upstream response through capture wrapper
+		crw := &cachingResponseWriter{
+			ResponseWriter: w,
+			maxCapture:     5 * 1024 * 1024, // 5MB max per image asset
+		}
+
+		sp.proxy.ServeHTTP(crw, r)
+
+		// Store in cache if 200 OK and within size limit
+		if !crw.tooLarge && crw.statusCode == http.StatusOK && crw.buf.Len() > 0 {
+			contentType := crw.Header().Get("Content-Type")
+			etag := crw.Header().Get("ETag")
+			sp.cache.Set(cacheKey, crw.buf.Bytes(), contentType, etag)
+		}
+		return
+	}
+
+	// Direct stream proxy (video chunks, API calls, WebSockets)
 	sp.proxy.ServeHTTP(w, r)
 }
 
@@ -115,4 +165,43 @@ func (sp *StreamProxy) Ping(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 	return nil
+}
+
+// cachingResponseWriter captures binary bytes for caching while immediately streaming to the client.
+type cachingResponseWriter struct {
+	http.ResponseWriter
+	buf         bytes.Buffer
+	statusCode  int
+	maxCapture  int64
+	tooLarge    bool
+	wroteHeader bool
+}
+
+func (crw *cachingResponseWriter) WriteHeader(code int) {
+	if !crw.wroteHeader {
+		crw.statusCode = code
+		crw.wroteHeader = true
+		crw.ResponseWriter.Header().Set("X-Meshbeacon-Cache", "MISS")
+		crw.ResponseWriter.WriteHeader(code)
+	}
+}
+
+func (crw *cachingResponseWriter) Write(b []byte) (int, error) {
+	if !crw.wroteHeader {
+		crw.WriteHeader(http.StatusOK)
+	}
+	n, err := crw.ResponseWriter.Write(b)
+	if !crw.tooLarge && int64(crw.buf.Len()+n) <= crw.maxCapture {
+		crw.buf.Write(b[:n])
+	} else if !crw.tooLarge {
+		crw.tooLarge = true
+		crw.buf.Reset() // drop buffer to prevent wasting memory on huge non-image responses
+	}
+	return n, err
+}
+
+func (crw *cachingResponseWriter) Flush() {
+	if f, ok := crw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
