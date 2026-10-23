@@ -180,10 +180,17 @@ docker run -d --name meshbeacon --restart=unless-stopped --net=host \
 ### Option B: Standalone Binary (Raspberry Pi / Linux / OpenWrt)
 
 #### 1-Line Turnkey Installer (Recommended)
-Automatically detects your OS and CPU architecture (x86_64, ARM64, ARMv7, MIPS), downloads the latest release binary, and configures either **OpenWrt procd** or **Linux systemd**:
+Automatically detects your OS and CPU architecture (x86_64, ARM64, ARMv7, MIPS), verifies SHA-256 checksums, downloads the latest release binary, and configures either **OpenWrt procd** or **Linux systemd**:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/shimco/meshbeacon/main/install.sh | sudo bash
+# Install or upgrade to latest release
+curl -sSL https://raw.githubusercontent.com/shimco/meshbeacon/main/install.sh | sh
+
+# Clean uninstallation (removes service and binary, preserves configuration)
+curl -sSL https://raw.githubusercontent.com/shimco/meshbeacon/main/install.sh | sh -s -- --uninstall
+
+# Full purge (removes service, binary, and /etc/meshbeacon configuration)
+curl -sSL https://raw.githubusercontent.com/shimco/meshbeacon/main/install.sh | sh -s -- --purge
 ```
 
 #### Manual Run / CLI Flags

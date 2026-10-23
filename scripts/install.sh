@@ -1,13 +1,17 @@
 #!/bin/sh
 # ==============================================================================
-# Meshbeacon Turnkey Installer
+# Meshbeacon Turnkey Installer & Manager
 # ==============================================================================
 # Description:
-#   Auto-detects CPU architecture and operating system, downloads the latest
-#   Meshbeacon release binary, and configures OpenWrt procd or Linux systemd.
+#   Auto-detects CPU architecture and operating system, verifies SHA256 checksums,
+#   downloads the latest Meshbeacon release binary, and configures OpenWrt procd
+#   or Linux systemd. Also supports clean, zero-trace uninstallation.
 #
-# Arguments / Flags:
-#   $1 - Optional version tag (e.g. v0.7.0). Defaults to latest release.
+# Usage:
+#   Install:     curl -sSL https://raw.githubusercontent.com/shimco/meshbeacon/main/install.sh | sh
+#   Install Ver: curl -sSL https://raw.githubusercontent.com/shimco/meshbeacon/main/install.sh | sh -s -- v0.7.0
+#   Uninstall:   curl -sSL https://raw.githubusercontent.com/shimco/meshbeacon/main/install.sh | sh -s -- --uninstall
+#   Purge All:   curl -sSL https://raw.githubusercontent.com/shimco/meshbeacon/main/install.sh | sh -s -- --purge
 #
 # Exit Codes:
 #   0 - Success
@@ -21,7 +25,7 @@ INSTALL_DIR_OPENWRT="/usr/bin"
 CONFIG_DIR="/etc/meshbeacon"
 
 log() {
-  printf "\033[1;34m[Meshbeacon Installer]\033[0m %s\n" "$*"
+  printf "\033[1;34m[Meshbeacon]\033[0m %s\n" "$*"
 }
 
 error() {
@@ -29,7 +33,84 @@ error() {
   exit 1
 }
 
+run_as_root() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  elif command -v doas >/dev/null 2>&1; then
+    doas "$@"
+  else
+    error "Root privileges required to run: $*"
+  fi
+}
+
+# ------------------------------------------------------------------------------
+# Uninstallation Routine
+# ------------------------------------------------------------------------------
+uninstall() {
+  log "Uninstalling Meshbeacon..."
+
+  # 1. Stop and remove OpenWrt procd service
+  if [ -f /etc/init.d/meshbeacon ]; then
+    log "Stopping and disabling OpenWrt service..."
+    /etc/init.d/meshbeacon stop 2>/dev/null || true
+    /etc/init.d/meshbeacon disable 2>/dev/null || true
+    rm -f /etc/init.d/meshbeacon
+  fi
+
+  # 2. Stop and remove Linux systemd service
+  if [ -f /etc/systemd/system/meshbeacon.service ]; then
+    log "Stopping and removing systemd service..."
+    run_as_root systemctl stop meshbeacon 2>/dev/null || true
+    run_as_root systemctl disable meshbeacon 2>/dev/null || true
+    run_as_root rm -f /etc/systemd/system/meshbeacon.service
+    run_as_root systemctl daemon-reload 2>/dev/null || true
+  fi
+
+  # 3. Remove installed binaries
+  for bin in "${INSTALL_DIR_LINUX}/meshbeacon" "${INSTALL_DIR_OPENWRT}/meshbeacon"; do
+    if [ -f "${bin}" ]; then
+      log "Removing binary: ${bin}"
+      run_as_root rm -f "${bin}"
+    fi
+  done
+
+  # 4. Handle configuration directory
+  if [ -d "${CONFIG_DIR}" ]; then
+    if [ "${1:-}" = "--purge" ] || [ "${PURGE:-0}" = "1" ]; then
+      log "Purging configuration directory: ${CONFIG_DIR}..."
+      run_as_root rm -rf "${CONFIG_DIR}"
+    else
+      log "Configuration preserved at ${CONFIG_DIR} (pass '--purge' to delete)."
+    fi
+  fi
+
+  log "Meshbeacon has been cleanly uninstalled."
+  exit 0
+}
+
+# Check for uninstall flags
+case "${1:-}" in
+  --uninstall|-u|uninstall)
+    uninstall "${2:-}"
+    ;;
+  --purge|purge)
+    uninstall "--purge"
+    ;;
+  --help|-h|help)
+    echo "Meshbeacon Installer & Uninstaller"
+    echo "Usage:"
+    echo "  install.sh [version]      Install or upgrade Meshbeacon (e.g. v0.7.0 or latest)"
+    echo "  install.sh --uninstall    Remove binary and background service (preserves config)"
+    echo "  install.sh --purge        Remove binary, background service, and config directory"
+    exit 0
+    ;;
+esac
+
+# ------------------------------------------------------------------------------
 # 1. Detect Operating System and Architecture
+# ------------------------------------------------------------------------------
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 
@@ -47,7 +128,7 @@ case "${ARCH}" in
     TARGET_ARCH="mipsle"
     ;;
   *)
-    error "Unsupported architecture: ${ARCH}"
+    error "Unsupported CPU architecture: ${ARCH}"
     ;;
 esac
 
@@ -65,10 +146,12 @@ esac
 
 log "Detected platform: ${TARGET_OS}/${TARGET_ARCH}"
 
+# ------------------------------------------------------------------------------
 # 2. Determine Version to Install
+# ------------------------------------------------------------------------------
 VERSION="${1:-}"
 if [ -z "${VERSION}" ]; then
-  log "Fetching latest release version from GitHub..."
+  log "Querying latest release from GitHub..."
   LATEST_JSON="$(curl -sSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null || true)"
   VERSION="$(echo "${LATEST_JSON}" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || true)"
   if [ -z "${VERSION}" ]; then
@@ -76,30 +159,50 @@ if [ -z "${VERSION}" ]; then
   fi
 fi
 
-log "Target version: ${VERSION}"
+log "Installing Meshbeacon ${VERSION}..."
 
-# 3. Download Release Binary
+# ------------------------------------------------------------------------------
+# 3. Download and Verify Release Binary
+# ------------------------------------------------------------------------------
 TARBALL="meshbeacon_${TARGET_OS}_${TARGET_ARCH}.tar.gz"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${TARBALL}"
+CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${VERSION}/checksums.txt"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
-log "Downloading ${DOWNLOAD_URL}..."
+log "Downloading ${TARBALL}..."
 if ! curl -sSL --fail "${DOWNLOAD_URL}" -o "${TMP_DIR}/${TARBALL}"; then
-  # Fallback to direct raw binary if available
-  RAW_URL="https://github.com/${REPO}/releases/download/${VERSION}/meshbeacon-${TARGET_OS}-${TARGET_ARCH}"
-  log "Archive download failed, attempting direct binary: ${RAW_URL}..."
-  if ! curl -sSL --fail "${RAW_URL}" -o "${TMP_DIR}/meshbeacon"; then
-    error "Failed to download Meshbeacon binary for ${TARGET_OS}/${TARGET_ARCH} (${VERSION})."
-  fi
-else
-  tar -xzf "${TMP_DIR}/${TARBALL}" -C "${TMP_DIR}"
+  error "Failed to download Meshbeacon release asset: ${DOWNLOAD_URL}"
 fi
 
+# Verify SHA256 checksum if utility is present
+if curl -sSL --fail "${CHECKSUMS_URL}" -o "${TMP_DIR}/checksums.txt" 2>/dev/null; then
+  EXPECTED_HASH="$(grep " ${TARBALL}\$" "${TMP_DIR}/checksums.txt" | awk '{print $1}')"
+  if [ -n "${EXPECTED_HASH}" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      ACTUAL_HASH="$(sha256sum "${TMP_DIR}/${TARBALL}" | awk '{print $1}')"
+    elif command -v shasum >/dev/null 2>&1; then
+      ACTUAL_HASH="$(shasum -a 256 "${TMP_DIR}/${TARBALL}" | awk '{print $1}')"
+    else
+      ACTUAL_HASH=""
+    fi
+
+    if [ -n "${ACTUAL_HASH}" ]; then
+      if [ "${ACTUAL_HASH}" != "${EXPECTED_HASH}" ]; then
+        error "Checksum verification failed! Expected: ${EXPECTED_HASH}, got: ${ACTUAL_HASH}"
+      fi
+      log "SHA-256 verification passed: ${ACTUAL_HASH}"
+    fi
+  fi
+fi
+
+tar -xzf "${TMP_DIR}/${TARBALL}" -C "${TMP_DIR}"
 chmod +x "${TMP_DIR}/meshbeacon"
 
-# 4. Check for OpenWrt Environment
+# ------------------------------------------------------------------------------
+# 4. OpenWrt Environment Installation
+# ------------------------------------------------------------------------------
 if [ -f /etc/openwrt_release ] || command -v opkg >/dev/null 2>&1; then
   log "OpenWrt environment detected. Installing to ${INSTALL_DIR_OPENWRT}..."
   mv "${TMP_DIR}/meshbeacon" "${INSTALL_DIR_OPENWRT}/meshbeacon"
@@ -126,7 +229,7 @@ start_service() {
 EOF
   chmod +x /etc/init.d/meshbeacon
 
-  # Create config directory and example config if missing
+  # Create config directory and default configuration if missing
   mkdir -p "${CONFIG_DIR}"
   if [ ! -f "${CONFIG_DIR}/meshbeacon.json" ]; then
     cat << 'EOF' > "${CONFIG_DIR}/meshbeacon.json"
@@ -160,16 +263,18 @@ EOF
   exit 0
 fi
 
+# ------------------------------------------------------------------------------
 # 5. Standard Linux Installation
+# ------------------------------------------------------------------------------
 if [ "${TARGET_OS}" = "linux" ]; then
   log "Installing binary to ${INSTALL_DIR_LINUX}/meshbeacon..."
-  sudo mkdir -p "${INSTALL_DIR_LINUX}"
-  sudo mv "${TMP_DIR}/meshbeacon" "${INSTALL_DIR_LINUX}/meshbeacon"
+  run_as_root mkdir -p "${INSTALL_DIR_LINUX}"
+  run_as_root mv "${TMP_DIR}/meshbeacon" "${INSTALL_DIR_LINUX}/meshbeacon"
 
   # Setup default configuration
-  sudo mkdir -p "${CONFIG_DIR}"
+  run_as_root mkdir -p "${CONFIG_DIR}"
   if [ ! -f "${CONFIG_DIR}/meshbeacon.json" ]; then
-    sudo tee "${CONFIG_DIR}/meshbeacon.json" > /dev/null << 'EOF'
+    run_as_root tee "${CONFIG_DIR}/meshbeacon.json" > /dev/null << 'EOF'
 {
   "advertise_addr": "auto",
   "cache": {
@@ -198,7 +303,7 @@ EOF
   # Setup systemd service if available
   if command -v systemctl >/dev/null 2>&1; then
     log "Configuring systemd service..."
-    sudo tee /etc/systemd/system/meshbeacon.service > /dev/null << 'EOF'
+    run_as_root tee /etc/systemd/system/meshbeacon.service > /dev/null << 'EOF'
 [Unit]
 Description=Meshbeacon - Local LAN Media Gateway & Autodiscovery
 After=network-online.target
@@ -214,20 +319,22 @@ LimitNOFILE=65536
 [Install]
 WantedBy=multi-user.target
 EOF
-    sudo systemctl daemon-reload
+    run_as_root systemctl daemon-reload
     log "Systemd unit installed! Enable and run with:"
-    echo "  sudo systemctl enable --now meshbeacon"
+    printf "  sudo systemctl enable --now meshbeacon\n"
   fi
 
   log "Installation complete! Run 'meshbeacon --help' to verify."
   exit 0
 fi
 
+# ------------------------------------------------------------------------------
 # 6. macOS Installation
+# ------------------------------------------------------------------------------
 if [ "${TARGET_OS}" = "darwin" ]; then
-  DEST="/usr/local/bin/meshbeacon"
-  mkdir -p /usr/local/bin 2>/dev/null || sudo mkdir -p /usr/local/bin
-  sudo mv "${TMP_DIR}/meshbeacon" "${DEST}"
+  DEST="${INSTALL_DIR_LINUX}/meshbeacon"
+  run_as_root mkdir -p "${INSTALL_DIR_LINUX}"
+  run_as_root mv "${TMP_DIR}/meshbeacon" "${DEST}"
   log "Installed Meshbeacon to ${DEST}"
   log "Run 'meshbeacon --help' or start with: meshbeacon -jellyfin http://<server>:8096"
   exit 0
