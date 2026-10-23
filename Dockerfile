@@ -1,15 +1,22 @@
 # Multi-stage Docker build for Meshbeacon
 FROM golang:1.24-alpine AS builder
 
+ARG TARGETOS=linux
+ARG TARGETARCH
+ARG TARGETVARIANT
+
 WORKDIR /app
 
-# Copy dependency manifests and source
-COPY go.mod ./
-COPY go.sum* ./
+# Copy dependency manifests
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
 COPY . .
 
-# Download dependencies and tidy
-RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /meshbeacon ./cmd/meshbeacon
+# Build statically linked binary for target architecture
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} ${TARGETARCH:+GOARCH=${TARGETARCH}} ${TARGETVARIANT:+GOARM=${TARGETVARIANT#v}} \
+    go build -ldflags="-w -s" -o /meshbeacon ./cmd/meshbeacon
 
 # Minimal runtime image
 FROM alpine:3.20

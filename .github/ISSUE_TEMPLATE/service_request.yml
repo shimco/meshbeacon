@@ -1,0 +1,54 @@
+---
+name: 💡 Service or Feature Request
+description: >-
+  Propose a new media service protocol, auto-discovery profile, or platform
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for a new service discovery profile (e.g. Immich,
+        Audiobookshelf, Navidrome) or hardware target? Tell us about it!
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New Service Discovery Protocol (e.g. Immich mDNS, Subsonic, Roon)
+        - Hardware / OS Target (e.g. OpenWrt, TrueNAS, unRAID)
+        - Streaming & Proxy Performance
+        - Web GUI & Configuration
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: >-
+        A clear and concise description of the limitation or difficulty you
+        are experiencing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / Protocol Details
+      description: >-
+        How should this work? If known, please link to documentation on
+        ports, broadcast payloads, or mDNS service strings (e.g.
+        _immich._tcp).
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Additional Context or Alternatives
+      description: >-
+        Any other context, client apps, or alternative solutions you have
+        considered.

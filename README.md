@@ -3,9 +3,11 @@
 > **Broadcast remote media servers across Tailscale, WireGuard, ZeroTier & Mesh networks into your local LAN with native Smart TV auto-discovery.**  
 > *Stream Jellyfin, Plex, Immich, Audiobookshelf, and Mealie to Smart TVs, digital photo frames, kitchen tablets, and family devices with zero VPN client apps.*
 
+[![CI](https://github.com/shimco/meshbeacon/actions/workflows/ci.yml/badge.svg)](https://github.com/shimco/meshbeacon/actions/workflows/ci.yml)
+[![Docker](https://github.com/shimco/meshbeacon/actions/workflows/docker.yml/badge.svg)](https://github.com/shimco/meshbeacon/actions/workflows/docker.yml)
+[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fshimco%2Fmeshbeacon-2496ED?logo=docker&logoColor=white)](https://github.com/shimco/meshbeacon/pkgs/container/meshbeacon)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/shimco/meshbeacon)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/shimco/meshbeacon)](https://goreportcard.com/report/github.com/shimco/meshbeacon)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 [![Binary Size](https://img.shields.io/badge/Binary-<7MB-success.svg)](https://github.com/shimco/meshbeacon/releases)
 
 > [!IMPORTANT]
@@ -112,12 +114,23 @@ Meshbeacon bridges your remote media server into your local home Wi-Fi:
 
 ## ⚡ Quick Start
 
-### Option A: Docker Compose (Recommended)
+### Option A: Docker Compose & Container (Recommended)
 
 > [!NOTE]
 > `network_mode: host` is **required** so Meshbeacon can bind and broadcast directly on the physical LAN's UDP discovery ports (`7359`, `32414`, `5353`).
+> 
+> **🧠 Multi-Arch Auto-Detection:** The official image (`ghcr.io/shimco/meshbeacon:latest`) includes multi-platform manifests for `linux/amd64` (Intel/AMD), `linux/arm64` (Raspberry Pi 4/5, Apple Silicon), and `linux/arm/v7` (Raspberry Pi 2/3/Zero 2W). Docker queries and pulls the correct architecture automatically.
 
-1. Copy the example configuration:
+#### 1-Line Quickstart (Zero-Config Test)
+To test immediately without creating files:
+```bash
+docker run -d --name meshbeacon --restart=unless-stopped --net=host \
+  -e UPSTREAM_JELLYFIN="http://media-server.your-tailnet.ts.net:8096" \
+  ghcr.io/shimco/meshbeacon:latest
+```
+
+#### Production with Docker Compose
+1. Create or copy the example configuration:
    ```bash
    cp meshbeacon.example.json meshbeacon.json
    ```
@@ -147,7 +160,19 @@ Meshbeacon bridges your remote media server into your local home Wi-Fi:
      ]
    }
    ```
-3. Run with `docker compose`:
+3. Use the included `docker-compose.yml`:
+   ```yaml
+   services:
+     meshbeacon:
+       image: ghcr.io/shimco/meshbeacon:latest
+       container_name: meshbeacon
+       restart: unless-stopped
+       network_mode: host
+       command: ["-config", "/etc/meshbeacon/meshbeacon.json"]
+       volumes:
+         - ./meshbeacon.json:/etc/meshbeacon/meshbeacon.json:ro
+   ```
+4. Start the container:
    ```bash
    docker compose up -d
    ```

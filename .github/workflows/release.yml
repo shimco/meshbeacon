@@ -1,0 +1,99 @@
+---
+name: Release Binaries
+
+"on":
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build & Release Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            goarm: ''
+          - goos: linux
+            goarch: arm64
+            goarm: ''
+          - goos: linux
+            goarch: arm
+            goarm: '7'
+          - goos: darwin
+            goarch: amd64
+            goarm: ''
+          - goos: darwin
+            goarch: arm64
+            goarm: ''
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Build Binary
+        id: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: 0
+        run: |
+          ARM_SFX=""
+          if [ -n "${{ matrix.goarm }}" ]; then
+            ARM_SFX="v${{ matrix.goarm }}"
+          fi
+          SUFFIX="${{ matrix.goos }}-${{ matrix.goarch }}${ARM_SFX}"
+          BIN_NAME="meshbeacon"
+          DIST_DIR="dist/meshbeacon-${{ github.ref_name }}-${SUFFIX}"
+          mkdir -p "${DIST_DIR}"
+
+          go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o "${DIST_DIR}/${BIN_NAME}" ./cmd/meshbeacon
+          cp README.md LICENSE meshbeacon.example.json "${DIST_DIR}/"
+
+          TAR_NAME="meshbeacon-${{ github.ref_name }}-${SUFFIX}.tar.gz"
+          tar -czf "dist/${TAR_NAME}" -C dist \
+            "meshbeacon-${{ github.ref_name }}-${SUFFIX}"
+          echo "tar_name=${TAR_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.build.outputs.tar_name }}
+          path: dist/${{ steps.build.outputs.tar_name }}
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Generate Checksums
+        working-directory: release-artifacts
+        run: |
+          sha256sum meshbeacon-*.tar.gz > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-artifacts/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false

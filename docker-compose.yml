@@ -1,7 +1,8 @@
+---
 services:
   meshbeacon:
-    build: .
     image: ghcr.io/shimco/meshbeacon:latest
+    # build: . # Uncomment to build locally from source
     container_name: meshbeacon
     restart: unless-stopped
     network_mode: host

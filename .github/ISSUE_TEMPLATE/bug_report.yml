@@ -1,0 +1,106 @@
+---
+name: 🐛 Bug Report
+description: >-
+  Report a discovery, streaming, or network proxy issue with Meshbeacon
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Meshbeacon! Please fill out the details
+        below so we can replicate and fix the issue.
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment Method
+      description: How are you running Meshbeacon?
+      options:
+        - Docker Compose (network_mode: host)
+        - Standalone Binary (Linux / Raspberry Pi)
+        - OpenWrt Router
+        - macOS Binary
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: smart_tv_os
+    attributes:
+      label: Client Device & OS
+      description: What client device/TV is attempting to discover or stream?
+      options:
+        - Google TV / Android TV (Sony, TCL, Hisense, Chromecast)
+        - Apple TV (tvOS) / Swiftfin / Infuse
+        - Fire TV (Amazon)
+        - Roku
+        - LG webOS
+        - Samsung Tizen
+        - Mobile App (iOS / Android)
+        - Digital Photo Frame / Tablet
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mesh_type
+    attributes:
+      label: Mesh / VPN Network Type
+      description: >-
+        What network carries traffic between Meshbeacon and upstream server?
+      options:
+        - Tailscale (MagicDNS / 100.x.y.z)
+        - WireGuard (Standard peer IP)
+        - ZeroTier
+        - Nebula
+        - Headscale
+        - Netbird
+        - Routed Subnet / Direct LAN (VLAN isolation)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: upstream_service
+    attributes:
+      label: Upstream Media Server
+      description: What service are you proxying?
+      options:
+        - Jellyfin
+        - Plex
+        - Immich
+        - Audiobookshelf
+        - Mealie
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: >-
+        A clear and concise description of what went wrong (e.g., TV does not
+        show server, stream buffers, connection drops).
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce the behavior?
+      placeholder: |
+        1. Start Meshbeacon with upstream Jellyfin URL...
+        2. Open Jellyfin app on Google TV...
+        3. App shows "Searching for servers" but never discovers Meshbeacon.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Meshbeacon Logs
+      description: Paste any relevant console or container logs here.
+      render: shell
