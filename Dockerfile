@@ -15,8 +15,9 @@ RUN go mod download
 COPY . .
 
 # Build statically linked binary for target architecture
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} ${TARGETARCH:+GOARCH=${TARGETARCH}} ${TARGETVARIANT:+GOARM=${TARGETVARIANT#v}} \
-    go build -ldflags="-w -s" -o /meshbeacon ./cmd/meshbeacon
+RUN if [ -n "$TARGETARCH" ]; then export GOARCH="$TARGETARCH"; fi && \
+    if [ "$TARGETARCH" = "arm" ] && [ -n "$TARGETVARIANT" ]; then export GOARM="${TARGETVARIANT#v}"; fi && \
+    CGO_ENABLED=0 GOOS="${TARGETOS:-linux}" go build -ldflags="-w -s" -o /meshbeacon ./cmd/meshbeacon
 
 # Minimal runtime image
 FROM alpine:3.20
