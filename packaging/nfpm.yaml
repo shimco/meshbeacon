@@ -1,0 +1,29 @@
+---
+name: "meshbeacon"
+arch: "${ARCH}"
+platform: "linux"
+version: "${VERSION}"
+section: "net"
+priority: "optional"
+maintainer: "Graham Shimmin <graham@shimmin.co>"
+description: "Local LAN media gateway and smart TV autodiscovery beacon"
+homepage: "https://shimmin.co/logs/meshbeacon-smart-tvs-wireguard-go"
+license: "MIT"
+contents:
+  - src: ./meshbeacon
+    dst: /usr/bin/meshbeacon
+    file_info:
+      mode: 0755
+  - src: ./packaging/systemd/meshbeacon.service
+    dst: /lib/systemd/system/meshbeacon.service
+    file_info:
+      mode: 0644
+  - src: ./meshbeacon.example.json
+    dst: /etc/meshbeacon/meshbeacon.json
+    type: "config|noreplace"
+    file_info:
+      mode: 0644
+scripts:
+  postinstall: ./packaging/scripts/postinstall.sh
+  preremove: ./packaging/scripts/preremove.sh
+  postremove: ./packaging/scripts/postremove.sh

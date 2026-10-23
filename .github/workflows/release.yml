@@ -61,12 +61,27 @@ jobs:
             -o meshbeacon ./cmd/meshbeacon
           tar -czf ${{ matrix.archive_name }}.tar.gz \
             meshbeacon meshbeacon.example.json LICENSE
+          if [ "${{ matrix.goos }}" = "linux" ] && \
+             [ "${{ matrix.goarch }}" != "mipsle" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            ARCH="${{ matrix.goarch }}"
+            [ "${{ matrix.goarm }}" = "7" ] && ARCH="armhf"
+            docker run --rm -v "$PWD":/app -w /app \
+              -e ARCH="${ARCH}" -e VERSION="${VERSION}" \
+              goreleaser/nfpm:latest pkg --config packaging/nfpm.yaml \
+              --target "${{ matrix.archive_name }}.deb"
+          fi
+          mkdir -p artifacts
+          cp ${{ matrix.archive_name }}.tar.gz artifacts/
+          if [ -f "${{ matrix.archive_name }}.deb" ]; then
+            cp ${{ matrix.archive_name }}.deb artifacts/
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.archive_name }}
-          path: ${{ matrix.archive_name }}.tar.gz
+          path: artifacts/*
           retention-days: 1
 
   publish:
@@ -86,7 +101,7 @@ jobs:
       - name: Generate Checksums
         run: |
           cd dist
-          sha256sum meshbeacon_*.tar.gz > checksums.txt
+          sha256sum meshbeacon_* > checksums.txt
           cat checksums.txt
 
       - name: Create GitHub Release
@@ -94,6 +109,7 @@ jobs:
         with:
           files: |
             dist/*.tar.gz
+            dist/*.deb
             dist/checksums.txt
           generate_release_notes: true
           draft: false

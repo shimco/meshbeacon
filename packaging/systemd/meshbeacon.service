@@ -1,0 +1,15 @@
+[Unit]
+Description=Meshbeacon - Local LAN Media Gateway & Autodiscovery
+Documentation=https://github.com/shimco/meshbeacon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/meshbeacon -config /etc/meshbeacon/meshbeacon.json
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

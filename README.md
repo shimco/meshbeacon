@@ -178,10 +178,45 @@ docker run -d --name meshbeacon --restart=unless-stopped --net=host \
    docker compose up -d
    ```
 
-### Option B: Standalone Binary (Raspberry Pi / Linux / OpenWrt)
+### Option B: Homebrew (macOS & Linux)
 
-#### 1-Line Turnkey Installer (Recommended)
-Automatically detects your OS and CPU architecture (x86_64, ARM64, ARMv7, MIPS), verifies SHA-256 checksums, downloads the latest release binary, and configures either **OpenWrt procd** or **Linux systemd**:
+Install via the official Shimco tap:
+
+```bash
+# Add the tap and install
+brew tap shimco/tap
+brew install meshbeacon
+
+# Optional: Run as a background daemon (auto-restarts on login)
+brew services start meshbeacon
+```
+
+Configuration is stored at `$(brew --prefix)/etc/meshbeacon/meshbeacon.json`.
+
+---
+
+### Option C: Debian / Ubuntu Package (`.deb`)
+
+For Ubuntu Server, Debian, Raspberry Pi OS, Linux Mint, or Pop!_OS:
+
+```bash
+# Download the latest deb for your architecture (amd64, arm64, or armhf)
+curl -LO https://github.com/shimco/meshbeacon/releases/latest/download/meshbeacon_linux_amd64.deb
+
+# Install package (automatically configures and starts the systemd service)
+sudo apt install ./meshbeacon_linux_amd64.deb
+```
+
+Edit your upstream media server URLs at `/etc/meshbeacon/meshbeacon.json`, then restart:
+```bash
+sudo systemctl restart meshbeacon
+```
+
+---
+
+### Option D: Turnkey POSIX Installer (Raspberry Pi / Linux / OpenWrt)
+
+Automatically detects your OS and CPU architecture (x86_64, ARM64, ARMv7, MIPS), verifies SHA-256 checksums, downloads the release binary, and configures either **OpenWrt procd** or **Linux systemd**:
 
 ```bash
 # Install or upgrade to latest release
@@ -195,7 +230,7 @@ curl -sSL https://raw.githubusercontent.com/shimco/meshbeacon/main/install.sh | 
 ```
 
 #### Manual Run / CLI Flags
-You can also run directly without installing a background service:
+You can also run directly from the terminal without a background daemon:
 
 ```bash
 # Using CLI flags (Server IDs and names are automatically fetched from upstream)
@@ -206,6 +241,25 @@ export UPSTREAM_JELLYFIN="http://media-server.your-tailnet.ts.net:8096"
 export UPSTREAM_PLEX="http://media-server.your-tailnet.ts.net:32400"
 meshbeacon
 ```
+
+---
+
+## 🧪 Hardware Compatibility & Tested Environments
+
+Meshbeacon is written in pure Go with zero external runtime dependencies (`CGO_ENABLED=0`). We believe in being transparent about which environments have been physically validated versus those currently in community testing:
+
+| Environment | Hardware / OS | Architecture | Status | Validation Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Linux Server** | Ubuntu Server 24.04 LTS (`homeserver`) | `amd64` (x86_64) | 🟢 **Verified** | Bare-metal (`systemd`), APT package (`.deb`), and Docker Compose |
+| **Apple Mac** | macOS 15 Sequoia (`themac`) | `arm64` (Apple Silicon) | 🟢 **Verified** | Standalone binary and Homebrew Tap (`brew services` background daemon) |
+| **Docker / Compose** | Docker 26+ / Compose 2.26+ | `amd64`, `arm64` | 🟢 **Verified** | Official multi-arch GHCR image with self-healing healthchecks |
+| **Raspberry Pi** | Raspberry Pi 4 (Debian 12 / RPi OS) | `arm64` | 🟡 **Active Testing** | Tested over Tailscale mesh network |
+| **OpenWrt Router** | MediaTek Filogic / GL.iNet (Beryl AX / Flint) | `arm64` / `mips` | 🟡 **Community Testing** | POSIX procd service installer tested; seeking community test reports |
+| **TrueNAS / BSD** | FreeBSD / TrueNAS SCALE | `amd64` | ⚪ **Planned** | Community feedback welcomed |
+
+> [!TIP]
+> **Help Validate Other Hardware!**  
+> If you are running Meshbeacon on an OpenWrt router, Orange Pi, Rockchip SBC, Proxmox LXC, or an older Raspberry Pi, please [open a Discussion](https://github.com/shimco/meshbeacon/discussions) or Issue with your test notes—we'd love to add your hardware setup to the verified list!
 
 ---
 
