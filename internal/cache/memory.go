@@ -42,14 +42,23 @@ func CalculateAutoRAMCacheSize(totalRAM int64) int64 {
 	}
 }
 
-// CalculateAutoRAMCacheSizeWithDisk returns a lightweight hot-buffer budget (capped at 64MB)
-// when secondary persistent disk caching is enabled, saving host RAM.
+// CalculateAutoRAMCacheSizeWithDisk returns a tiered hot-buffer budget when
+// secondary persistent disk caching is enabled:
+// - Micro-routers (<=128MB): 8MB
+// - Mini SBCs (<=512MB): 32MB
+// - Moderate SBCs (1GB-2GB): 64MB (~1,600 posters)
+// - Capable SBCs & Servers (>=4GB): 128MB (~3,200 posters)
 func CalculateAutoRAMCacheSizeWithDisk(totalRAM int64) int64 {
-	base := CalculateAutoRAMCacheSize(totalRAM)
-	if base > 64*MB {
+	switch {
+	case totalRAM <= 128*MB:
+		return 8 * MB
+	case totalRAM <= 512*MB:
+		return 32 * MB
+	case totalRAM < 4*GB:
 		return 64 * MB
+	default:
+		return 128 * MB
 	}
-	return base
 }
 
 // ParseSize converts a user size string (e.g. "auto", "64MB", "2GB", "off") to bytes.

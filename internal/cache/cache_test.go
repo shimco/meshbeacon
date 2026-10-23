@@ -146,10 +146,10 @@ func TestCalculateAutoRAMCacheSizeWithDisk(t *testing.T) {
 		{ram: 128 * MB, expected: 8 * MB},
 		{ram: 256 * MB, expected: 32 * MB},
 		{ram: 512 * MB, expected: 32 * MB},
-		{ram: 1 * GB, expected: 64 * MB},  // Capped at 64MB hot buffer
-		{ram: 2 * GB, expected: 64 * MB},  // Capped at 64MB hot buffer
-		{ram: 4 * GB, expected: 64 * MB},  // Capped at 64MB hot buffer
-		{ram: 16 * GB, expected: 64 * MB}, // Capped at 64MB hot buffer
+		{ram: 1 * GB, expected: 64 * MB},   // 1GB SBCs get 64MB hot-buffer
+		{ram: 2 * GB, expected: 64 * MB},   // 2GB SBCs get 64MB hot-buffer
+		{ram: 4 * GB, expected: 128 * MB},  // 4GB+ devices get 128MB hot-buffer (~3,200 posters)
+		{ram: 16 * GB, expected: 128 * MB}, // Homelabs/servers get 128MB hot-buffer (~3,200 posters)
 	}
 
 	for _, tc := range tests {

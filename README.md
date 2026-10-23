@@ -305,7 +305,7 @@ If you run Meshbeacon on a homelab server, mini-PC, or NAS with an SSD or NVMe d
 
 ```bash
 # 1. Balanced Mode (Default "auto" when disk is enabled):
-# Automatically caps RAM to a lightweight 64MB hot-buffer and stores up to 10GB on SSD
+# Automatically scales RAM to a 64MB–128MB hot-buffer (128MB on >=4GB hosts) and stores up to 10GB on SSD
 meshbeacon -cache-dir /mnt/nvme/meshbeacon -cache-disk-size 10GB
 
 # 2. Pure NVMe Disk Only (0 MB RAM used for images):
@@ -329,7 +329,7 @@ Or in `meshbeacon.json`:
 > [!NOTE]
 > **Intelligent "Auto" Downscaling with Disk:**
 > * When `disk_dir` is **disabled**: `ram_size: "auto"` uses your full hardware bracket (up to 512MB on servers) to guard remote WAN mesh bandwidth.
-> * When `disk_dir` is **enabled**: `ram_size: "auto"` automatically drops down to a **64MB hot-buffer** (~1,500 posters) for the active TV season, saving ~450MB of host RAM while letting the SSD handle your complete multi-gigabyte library.
+> * When `disk_dir` is **enabled**: `ram_size: "auto"` scales down to a tailored hot-buffer: **64MB** on 1GB–2GB SBCs, or **128MB** (~3,200 posters) on $\ge$4GB servers, saving ~400MB of host RAM while keeping entire household media catalogs instant in memory.
 > * Set `ram_size: "off"` for **Pure Disk Mode** if you want zero image data stored in RAM. On modern NVMe SSDs (read latency ~0.02ms), local Wi-Fi latency (2–10ms) is the only limiting factor.
 
 *(Video streaming chunks `.ts`, `.m3u8`, and Range requests bypass the cache entirely and stream directly through the zero-allocation 32KB buffer pool).*
