@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # ==============================================================================
 # Meshbeacon Turnkey Installer
 # ==============================================================================
@@ -13,7 +13,7 @@
 #   0 - Success
 #   1 - Failure / Unsupported platform
 # ==============================================================================
-set -euo pipefail
+set -eu
 
 REPO="shimco/meshbeacon"
 INSTALL_DIR_LINUX="/usr/local/bin"
@@ -21,11 +21,11 @@ INSTALL_DIR_OPENWRT="/usr/bin"
 CONFIG_DIR="/etc/meshbeacon"
 
 log() {
-  echo -e "\033[1;34m[Meshbeacon Installer]\033[0m $*"
+  printf "\033[1;34m[Meshbeacon Installer]\033[0m %s\n" "$*"
 }
 
 error() {
-  echo -e "\033[1;31m[Error]\033[0m $*" >&2
+  printf "\033[1;31m[Error]\033[0m %s\n" "$*" >&2
   exit 1
 }
 
