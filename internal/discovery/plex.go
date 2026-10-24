@@ -35,6 +35,12 @@ func (b *PlexGDMBeacon) Name() string {
 
 // Start begins listening on UDP port for GDM search queries until ctx is canceled.
 func (b *PlexGDMBeacon) Start(ctx context.Context) error {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("[Plex Beacon Panic Recovered] %v", rec)
+		}
+	}()
+
 	addr := net.UDPAddr{
 		Port: b.port,
 		IP:   net.ParseIP("0.0.0.0"),

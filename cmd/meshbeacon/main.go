@@ -20,7 +20,7 @@ import (
 	"github.com/shimco/meshbeacon/internal/proxy"
 )
 
-var version = "v0.8.0"
+var version = "v0.8.1"
 
 func getEnv(key, defaultVal string) string {
 	if val := os.Getenv(key); val != "" {
@@ -355,6 +355,11 @@ func main() {
 			wg.Add(1)
 			go func(beacon discovery.Beacon) {
 				defer wg.Done()
+				defer func() {
+					if rec := recover(); rec != nil {
+						log.Printf("[%s Panic Recovered] %v", beacon.Name(), rec)
+					}
+				}()
 				if err := beacon.Start(ctx); err != nil {
 					log.Printf("[%s Error] %v", beacon.Name(), err)
 				}

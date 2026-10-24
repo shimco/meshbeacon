@@ -38,8 +38,10 @@ func NewGateway(services []config.ServiceConfig, assetCache *cache.DualTierCache
 		}
 
 		server := &http.Server{
-			Addr:    fmt.Sprintf(":%d", svc.LocalPort),
-			Handler: rp,
+			Addr:              fmt.Sprintf(":%d", svc.LocalPort),
+			Handler:           rp,
+			ReadHeaderTimeout: 10 * time.Second,
+			IdleTimeout:       120 * time.Second,
 		}
 		gw.servers = append(gw.servers, server)
 		gw.proxies = append(gw.proxies, rp)

@@ -42,6 +42,12 @@ func (b *MDNSBeacon) Name() string {
 
 // Start runs active multicast announcements and listens for incoming queries until ctx is canceled.
 func (b *MDNSBeacon) Start(ctx context.Context) error {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("[mDNS Beacon Panic Recovered][%s] %v", b.serviceType, rec)
+		}
+	}()
+
 	mcastAddr, err := net.ResolveUDPAddr("udp4", "224.0.0.251:5353")
 	if err != nil {
 		return fmt.Errorf("failed to resolve mDNS multicast address: %w", err)
@@ -116,6 +122,12 @@ func (b *MDNSBeacon) Start(ctx context.Context) error {
 
 // listenForQueries reads incoming mDNS queries and immediately replies if our service is requested.
 func (b *MDNSBeacon) listenForQueries(ctx context.Context, inConn *net.UDPConn, outConn *net.UDPConn, replyPacket []byte) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("[mDNS Query Listener Panic Recovered][%s] %v", b.serviceType, rec)
+		}
+	}()
+
 	buf := make([]byte, 4096)
 	targetService := strings.ToLower(b.serviceType + ".local")
 	targetEnum := "_services._dns-sd._udp.local"

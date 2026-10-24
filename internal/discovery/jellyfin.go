@@ -63,6 +63,12 @@ func (b *JellyfinBeacon) Name() string {
 
 // Start runs both the passive probe listener and active broadcaster until ctx is canceled.
 func (b *JellyfinBeacon) Start(ctx context.Context) error {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("[Jellyfin Beacon Panic Recovered] %v", rec)
+		}
+	}()
+
 	listenAddr := net.UDPAddr{
 		Port: b.port,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -82,6 +88,12 @@ func (b *JellyfinBeacon) Start(ctx context.Context) error {
 
 	// Active broadcaster goroutine with fast initial convergence
 	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("[Jellyfin Broadcaster Panic Recovered] %v", rec)
+			}
+		}()
+
 		// 1. Initial immediate broadcast
 		b.broadcastAll(conn)
 

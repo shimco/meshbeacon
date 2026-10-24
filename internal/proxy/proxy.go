@@ -112,6 +112,13 @@ func NewStreamProxy(name, targetURL string, assetCache *cache.DualTierCache, tel
 
 // ServeHTTP handles incoming requests, serving static artwork from cache and streaming video through buffers.
 func (sp *StreamProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("[Panic Recovered][%s] %s %s: %v", sp.name, r.Method, r.URL.Path, rec)
+			http.Error(w, "Meshbeacon Gateway Error: Internal server error", http.StatusInternalServerError)
+		}
+	}()
+
 	ip := clientIP(r)
 
 	// Intercept static artwork requests if caching is enabled
