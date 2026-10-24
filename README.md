@@ -15,7 +15,7 @@
 ## The Problem
 
 Running VPN clients directly on Smart TVs (Google TV, Android TV, Apple TV, Fire TV, Roku) causes chronic friction:
-1. **Aggressive Standby Sleep:** Smart TV OSes aggressively terminate background VPN processes to conserve RAM. Waking the TV leaves the WireGuard tunnel dead and media apps buffering indefinitely.
+1. **Aggressive Standby Sleep:** Android TV and Smart TV platforms aggressively kill background VPN processes to conserve memory during standby. Waking the TV leaves tunnels like Tailscale dead and media apps buffering indefinitely.
 2. **Family Support Overhead:** Explaining VPN client toggles, MFA, or private IP configuration to non-technical partners, kids, or parents is an ongoing support burden.
 3. **Plex Relay Throttling:** Without local network presence, Plex falls back to its 2 Mbps internet relay, forcing heavy video transcoding on your server.
 
