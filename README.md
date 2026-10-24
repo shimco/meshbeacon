@@ -244,6 +244,35 @@ meshbeacon
 
 ---
 
+## 🎬 Plex Media Server Configuration (Direct Play & Zero Relay)
+
+While **Jellyfin** works automatically via UDP 7359 broadcasts without any server-side adjustments, **Plex** client apps (LG webOS, Samsung Tizen, Apple TV, Fire TV, Android/iOS) consult `plex.tv` to verify valid connection endpoints.
+
+> [!IMPORTANT]
+> If your Meshbeacon IP is not published to Plex, client apps on your home Wi-Fi will silently fall back to the **Plex Relay** (`*.plex.direct` proxy capped at 2 Mbps), forcing unnecessary CPU/GPU video transcoding and bandwidth throttling.
+
+### 1-Minute Plex Configuration:
+
+1. Open **Plex Web** on your server (`http://<your-plex-server>:32400/web`).
+2. Navigate to **Settings** (wrench icon, top-right) $\to$ **Server** $\to$ **Network** (click **Show Advanced**).
+3. In **Custom server access URLs**, append your Meshbeacon LAN gateway IP:
+   ```text
+   http://<tailscale-ip>:32400,http://<meshbeacon-lan-ip>:32400
+   ```
+   *(Example: `http://100.103.61.68:32400,http://192.168.100.2:32400`)*
+4. In **LAN Networks**, declare your local subnet and Tailscale network as local:
+   ```text
+   192.168.0.0/255.255.0.0,100.0.0.0/255.0.0.0
+   ```
+5. Click **Save Changes**.
+
+### How to Verify:
+Open media on your Smart TV or phone app. In the playback HUD under **Playback Info** (or **Stream Details**), it will show:
+* **Player**: `Direct Play` (Original quality, zero transcode)
+* **Source**: `Local` / `Direct` (Streaming at full LAN speed through Meshbeacon)
+
+---
+
 ## 🧪 Hardware Compatibility & Tested Environments
 
 Meshbeacon is written in pure Go with zero external runtime dependencies (`CGO_ENABLED=0`). We believe in being transparent about which environments have been physically validated versus those currently in community testing:
