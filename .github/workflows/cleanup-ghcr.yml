@@ -31,4 +31,4 @@ jobs:
           delete-untagged: true
           delete-partial-images: true
           dry-run: ${{ inputs.dry_run || false }}
-          validate-token: true
+          validate: true
