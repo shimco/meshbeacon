@@ -255,15 +255,17 @@ While **Jellyfin** works automatically via UDP 7359 broadcasts without any serve
 
 1. Open **Plex Web** on your server (`http://<your-plex-server>:32400/web`).
 2. Navigate to **Settings** (wrench icon, top-right) $\to$ **Server** $\to$ **Network** (click **Show Advanced**).
-3. In **Custom server access URLs**, append your Meshbeacon LAN gateway IP:
+3. In **Custom server access URLs**, add your Meshbeacon LAN gateway IP:
    ```text
-   http://<tailscale-ip>:32400,http://<meshbeacon-lan-ip>:32400
+   http://<meshbeacon-lan-ip>:32400
    ```
-   *(Example: `http://100.103.61.68:32400,http://192.168.100.2:32400`)*
-4. In **LAN Networks**, declare your local subnet and Tailscale network as local:
+   *(If you also connect directly to your server over Tailscale/WireGuard on your laptop or phone, comma-separate both URLs so direct mesh connections continue to work on the road: `http://100.103.61.68:32400,http://192.168.100.2:32400`)*
+4. In **LAN Networks**, define your local home network (and optionally your mesh VPN subnet):
    ```text
    192.168.0.0/255.255.0.0,100.0.0.0/255.0.0.0
    ```
+   * **Why this matters**: Plex treats any IP outside its immediate subnet as "Remote", which enforces bandwidth throttling and video transcoding. Adding your home LAN range (`192.168.0.0/255.255.0.0`) ensures that all traffic routed through Meshbeacon is treated as unthrottled **Local Direct Play**.
+   * **Bonus**: Adding your mesh network range (Tailscale `100.0.0.0/255.0.0.0` or WireGuard `10.0.0.0/255.0.0.0`) ensures your phone and laptop also get unthrottled direct playback when running VPN clients away from home.
 5. Click **Save Changes**.
 
 ### How to Verify:
