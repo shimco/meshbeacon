@@ -125,6 +125,21 @@ func TestIsCacheableAsset(t *testing.T) {
 		{"plex", "GET", "/video/:/transcode/universal/session.m3u8", false},
 		// Immich matches
 		{"immich", "GET", "/api/assets/abc-123/thumbnail", true},
+		// Audiobookshelf matches
+		{"audiobookshelf", "GET", "/api/items/book-123/cover", true},
+		{"audiobookshelf", "GET", "/api/authors/author-456/image", true},
+		// Audio streams (MUST NOT cache)
+		{"audiobookshelf", "GET", "/api/items/book-123/audio.m4b", false},
+		{"navidrome", "GET", "/rest/stream?id=song-1.flac", false},
+		// Kavita matches
+		{"kavita", "GET", "/api/image/series-789", true},
+		{"kavita", "GET", "/api/series/cover/series-789", true},
+		// Mealie matches
+		{"mealie", "GET", "/api/media/recipes/pancake-123/images/original.webp", true},
+		// Navidrome matches
+		{"navidrome", "GET", "/rest/getCoverArt?id=album-123", true},
+		// RomM matches
+		{"romm", "GET", "/api/roms/mario-123/cover", true},
 		// Non-GET requests
 		{"jellyfin", "POST", "/Items/123/Images/Primary", false},
 	}

@@ -281,7 +281,7 @@ Meshbeacon is written in pure Go with zero external runtime dependencies (`CGO_E
 
 ## 💾 Pragmatic Hardware & Asset Caching Strategy
  
-Media server posters and photo thumbnails are small (30KB–150KB), but requesting hundreds of them across a high-latency WAN mesh tunnel slows down Smart TV interfaces. Meshbeacon intercepts artwork queries (`/Items/{id}/Images/*` for Jellyfin and `/photo/:/transcode` for Plex), serving hits instantly from local memory.
+Media server posters, photo thumbnails, book covers, and recipe photography are small (30KB–150KB), but requesting hundreds of them across a high-latency WAN mesh tunnel slows down Smart TV interfaces, e-readers, and kitchen tablets. Meshbeacon intercepts artwork queries (Jellyfin posters, Plex thumbnails, Immich photos, Audiobookshelf covers, Kavita/Komga book covers, Mealie recipes, and Navidrome album art), serving hits instantly from local memory and NVMe SSD.
  
 ### Hardware-Bracketed "Auto" Memory Allocation
  

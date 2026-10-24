@@ -22,7 +22,15 @@ func IsCacheableAsset(serviceName, method, path string) bool {
 		strings.HasSuffix(p, ".ts") ||
 		strings.HasSuffix(p, ".mp4") ||
 		strings.HasSuffix(p, ".mkv") ||
-		strings.HasSuffix(p, ".mpd") {
+		strings.HasSuffix(p, ".mpd") ||
+		strings.HasSuffix(p, ".m4b") ||
+		strings.HasSuffix(p, ".m4a") ||
+		strings.HasSuffix(p, ".mp3") ||
+		strings.HasSuffix(p, ".flac") ||
+		strings.HasSuffix(p, ".opus") ||
+		strings.HasSuffix(p, ".ogg") ||
+		strings.HasSuffix(p, ".wav") ||
+		strings.HasSuffix(p, ".aac") {
 		return false
 	}
 
@@ -50,7 +58,45 @@ func IsCacheableAsset(serviceName, method, path string) bool {
 		return true
 	}
 
-	// 4. Common static image asset file extensions
+	// 4. Audiobookshelf book covers, podcast art & author avatars
+	if strings.Contains(p, "/api/items/") && strings.Contains(p, "/cover") ||
+		strings.Contains(p, "/api/authors/") && strings.Contains(p, "/image") ||
+		strings.Contains(p, "/api/podcasts/") && strings.Contains(p, "/cover") ||
+		strings.Contains(p, "/api/books/") && strings.Contains(p, "/cover") {
+		return true
+	}
+
+	// 5. Kavita & Komga eBook / Manga / Comic covers and thumbnails
+	if strings.Contains(p, "/api/image/") ||
+		strings.Contains(p, "/api/series/cover/") ||
+		strings.Contains(p, "/api/volume/cover/") ||
+		strings.Contains(p, "/api/chapter/cover/") ||
+		strings.Contains(p, "/thumbnail") && (strings.Contains(p, "/api/v1/series/") || strings.Contains(p, "/api/v1/books/")) {
+		return true
+	}
+
+	// 6. Mealie recipe photography, food thumbnails & themes
+	if strings.Contains(p, "/api/media/recipes/") ||
+		strings.Contains(p, "/api/media/themes/") ||
+		strings.Contains(p, "/api/media/organizer/") {
+		return true
+	}
+
+	// 7. Navidrome / Subsonic music album art & artist avatars
+	if strings.Contains(p, "/rest/getcoverart") ||
+		strings.Contains(p, "/rest/getavatar") ||
+		strings.Contains(p, "/api/album/") && strings.Contains(p, "/cover") ||
+		strings.Contains(p, "/api/artist/") && strings.Contains(p, "/image") {
+		return true
+	}
+
+	// 8. RomM retro game box art, cartridge art & screenshots
+	if strings.Contains(p, "/api/roms/") && (strings.Contains(p, "/cover") || strings.Contains(p, "/screenshots")) ||
+		strings.Contains(p, "/assets/covers/") {
+		return true
+	}
+
+	// 9. Common static image asset file extensions
 	if strings.HasSuffix(p, ".jpg") ||
 		strings.HasSuffix(p, ".jpeg") ||
 		strings.HasSuffix(p, ".png") ||

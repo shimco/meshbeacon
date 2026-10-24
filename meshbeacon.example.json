@@ -45,6 +45,33 @@
       }
     },
     {
+      "name": "audiobookshelf",
+      "local_port": 13378,
+      "upstream_url": "http://audiobooks.your-tailnet.ts.net:13378",
+      "discovery": {
+        "type": "audiobookshelf",
+        "server_name": "Living Room Audiobooks"
+      }
+    },
+    {
+      "name": "kavita",
+      "local_port": 5000,
+      "upstream_url": "http://books.your-tailnet.ts.net:5000",
+      "discovery": {
+        "type": "kavita",
+        "server_name": "Living Room Books"
+      }
+    },
+    {
+      "name": "mealie",
+      "local_port": 9000,
+      "upstream_url": "http://recipes.your-tailnet.ts.net:9000",
+      "discovery": {
+        "type": "mealie",
+        "server_name": "Kitchen Recipes"
+      }
+    },
+    {
       "name": "office-printer",
       "local_port": 631,
       "upstream_url": "http://cups.your-tailnet.ts.net:631",

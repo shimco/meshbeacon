@@ -33,3 +33,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD /usr/local/bin/meshbeacon -health-check -config /etc/meshbeacon/meshbeacon.json 2>/dev/null || /usr/local/bin/meshbeacon -health-check || exit 1
 
 ENTRYPOINT ["meshbeacon"]
+CMD ["-config", "/etc/meshbeacon/meshbeacon.json"]

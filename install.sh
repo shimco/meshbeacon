@@ -218,19 +218,19 @@ if [ -f /etc/openwrt_release ] || command -v opkg >/dev/null 2>&1; then
   mv "${TMP_DIR}/meshbeacon" "${INSTALL_DIR_OPENWRT}/meshbeacon"
 
   # Setup procd init script
-  cat << 'EOF' > /etc/init.d/meshbeacon
+  cat << EOF > /etc/init.d/meshbeacon
 #!/bin/sh /etc/rc.common
 USE_PROCD=1
 START=95
 STOP=10
 
-PROG=/usr/bin/meshbeacon
-CONFIG_FILE=/etc/meshbeacon/meshbeacon.json
+PROG=${INSTALL_DIR_OPENWRT}/meshbeacon
+CONFIG_FILE=${CONFIG_DIR}/meshbeacon.json
 
 start_service() {
-    [ -f "$CONFIG_FILE" ] || return 1
+    [ -f "\$CONFIG_FILE" ] || return 1
     procd_open_instance
-    procd_set_param command "$PROG" -config "$CONFIG_FILE"
+    procd_set_param command "\$PROG" -config "\$CONFIG_FILE"
     procd_set_param respawn 3600 5 0
     procd_set_param stdout 1
     procd_set_param stderr 1

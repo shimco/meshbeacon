@@ -83,6 +83,14 @@ func main() {
 
 	// 1. Load Configuration
 	var cfg *config.Config
+	if *configFile == "" {
+		if *upstreamJellyfin == "" && *upstreamPlex == "" && *upstreamImmich == "" {
+			if _, err := os.Stat("/etc/meshbeacon/meshbeacon.json"); err == nil {
+				*configFile = "/etc/meshbeacon/meshbeacon.json"
+			}
+		}
+	}
+
 	if *configFile != "" {
 		var err error
 		cfg, err = config.LoadConfig(*configFile)
@@ -287,6 +295,43 @@ func main() {
 				svc.Discovery.TXT = map[string]string{"path": "/api"}
 			} else if _, ok := svc.Discovery.TXT["path"]; !ok {
 				svc.Discovery.TXT["path"] = "/api"
+			}
+			txt := svc.Discovery.FormattedTXT()
+			beacons = append(beacons, discovery.NewMDNSBeacon(displayName, serviceType, svc.LocalPort, txt))
+
+		case "audiobookshelf":
+			serviceType := svc.Discovery.NormalizeServiceType("_audiobookshelf._tcp")
+			displayName := svc.Discovery.ServerName
+			if displayName == "" {
+				displayName = "Audiobookshelf"
+			}
+			txt := svc.Discovery.FormattedTXT()
+			beacons = append(beacons, discovery.NewMDNSBeacon(displayName, serviceType, svc.LocalPort, txt))
+
+		case "kavita":
+			serviceType := svc.Discovery.NormalizeServiceType("_kavita._tcp")
+			displayName := svc.Discovery.ServerName
+			if displayName == "" {
+				displayName = "Kavita"
+			}
+			txt := svc.Discovery.FormattedTXT()
+			beacons = append(beacons, discovery.NewMDNSBeacon(displayName, serviceType, svc.LocalPort, txt))
+			beacons = append(beacons, discovery.NewMDNSBeacon(displayName+" OPDS", "_opds._tcp", svc.LocalPort, []string{"path=/api/opds"}))
+
+		case "mealie":
+			serviceType := svc.Discovery.NormalizeServiceType("_mealie._tcp")
+			displayName := svc.Discovery.ServerName
+			if displayName == "" {
+				displayName = "Mealie"
+			}
+			txt := svc.Discovery.FormattedTXT()
+			beacons = append(beacons, discovery.NewMDNSBeacon(displayName, serviceType, svc.LocalPort, txt))
+
+		case "navidrome", "subsonic":
+			serviceType := svc.Discovery.NormalizeServiceType("_subsonic._tcp")
+			displayName := svc.Discovery.ServerName
+			if displayName == "" {
+				displayName = "Navidrome"
 			}
 			txt := svc.Discovery.FormattedTXT()
 			beacons = append(beacons, discovery.NewMDNSBeacon(displayName, serviceType, svc.LocalPort, txt))
