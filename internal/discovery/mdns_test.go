@@ -24,7 +24,7 @@ func TestEncodeAndParseDomainName(t *testing.T) {
 
 func TestBuildDNSResponseStructure(t *testing.T) {
 	b := NewMDNSBeacon("Living Room", "_jellyfin._tcp", 8096, []string{"path=/"})
-	ips := []net.IP{net.ParseIP("192.168.100.2")}
+	ips := []net.IP{net.ParseIP("192.168.0.2")}
 
 	packet := b.buildDNSResponse("test-host", ips, false)
 

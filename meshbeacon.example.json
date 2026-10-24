@@ -12,7 +12,7 @@
     {
       "name": "jellyfin",
       "local_port": 8096,
-      "upstream_url": "http://mediaserver.your-tailnet.ts.net:8096",
+      "upstream_url": "http://media-server.your-tailnet.ts.net:8096",
       "discovery": {
         "type": "jellyfin",
         "port": 7359,
@@ -23,7 +23,7 @@
     {
       "name": "plex",
       "local_port": 32400,
-      "upstream_url": "http://mediaserver.your-tailnet.ts.net:32400",
+      "upstream_url": "http://media-server.your-tailnet.ts.net:32400",
       "discovery": {
         "type": "plex",
         "port": 32414,

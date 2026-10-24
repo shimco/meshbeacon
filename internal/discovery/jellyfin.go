@@ -34,7 +34,7 @@ type JellyfinBeacon struct {
 }
 
 // NewJellyfinBeacon creates a new Jellyfin discovery responder.
-// advertiseAddr must be the full HTTP URL, e.g. "http://192.168.100.2".
+// advertiseAddr must be the full HTTP URL, e.g. "http://192.168.0.2".
 // The port is appended and the URL is normalized to always have a trailing slash.
 func NewJellyfinBeacon(port int, advertiseAddr, serverId, serverName string) *JellyfinBeacon {
 	// Normalize: ensure trailing slash on address (required by Jellyfin clients)

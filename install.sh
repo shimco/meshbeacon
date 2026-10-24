@@ -256,7 +256,7 @@ EOF
     {
       "name": "jellyfin",
       "local_port": 8096,
-      "upstream_url": "http://mediaserver:8096",
+      "upstream_url": "http://media-server:8096",
       "discovery": {
         "type": "jellyfin",
         "port": 7359
@@ -298,7 +298,7 @@ if [ "${TARGET_OS}" = "linux" ]; then
     {
       "name": "jellyfin",
       "local_port": 8096,
-      "upstream_url": "http://mediaserver:8096",
+      "upstream_url": "http://media-server:8096",
       "discovery": {
         "type": "jellyfin",
         "port": 7359

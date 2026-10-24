@@ -54,7 +54,7 @@ func (d *DiscoveryConfig) FormattedTXT() []string {
 type ServiceConfig struct {
 	Name        string          `json:"name"`         // e.g. "jellyfin", "plex", "immich", "cups"
 	LocalPort   int             `json:"local_port"`   // e.g. 8096, 32400, 2283, 631
-	UpstreamURL string          `json:"upstream_url"` // e.g. "http://mediaserver.your-tailnet.ts.net:8096"
+	UpstreamURL string          `json:"upstream_url"` // e.g. "http://media-server.your-tailnet.ts.net:8096"
 	Discovery   DiscoveryConfig `json:"discovery"`
 }
 
