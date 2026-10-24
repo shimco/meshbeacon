@@ -264,7 +264,8 @@ While **Jellyfin** works automatically via UDP 7359 broadcasts without any serve
    ```text
    192.168.0.0/255.255.0.0,100.0.0.0/255.0.0.0
    ```
-   * **Why this matters**: Plex treats any IP outside its immediate subnet as "Remote", which enforces bandwidth throttling and video transcoding. Adding your home LAN range (`192.168.0.0/255.255.0.0`) ensures that all traffic routed through Meshbeacon is treated as unthrottled **Local Direct Play**.
+   * **Why this matters**: Plex treats any IP outside its immediate subnet as "Remote", which enforces artificial bandwidth throttling and forces video transcoding down to 2 Mbps. Adding your home LAN range (`192.168.0.0/255.255.0.0`) tells Plex that Meshbeacon is local, enabling **uncompressed Direct Play by default**.
+   * **Direct Play vs. Transcoding**: This does *not* disable transcoding when you actually need it. If an older Smart TV cannot decode a specific video codec (e.g., AV1 or HEVC) or audio track (TrueHD/DTS), or if a client selects "Auto" quality, Plex will still transcode dynamically. However, it will do so based on actual client hardware capability and screen needs, rather than being forced into an artificial 2 Mbps cloud relay bottleneck.
    * **Bonus**: Adding your mesh network range (Tailscale `100.0.0.0/255.0.0.0` or WireGuard `10.0.0.0/255.0.0.0`) ensures your phone and laptop also get unthrottled direct playback when running VPN clients away from home.
 5. Click **Save Changes**.
 
