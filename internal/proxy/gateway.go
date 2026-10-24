@@ -14,23 +14,25 @@ import (
 
 // Gateway manages a collection of concurrent reverse proxies across multiple ports.
 type Gateway struct {
-	services []config.ServiceConfig
-	servers  []*http.Server
-	proxies  []*StreamProxy
-	cache    *cache.DualTierCache
+	services  []config.ServiceConfig
+	servers   []*http.Server
+	proxies   []*StreamProxy
+	cache     *cache.DualTierCache
+	telemetry *Telemetry
 }
 
 // NewGateway creates a gateway from service configs.
-func NewGateway(services []config.ServiceConfig, assetCache *cache.DualTierCache) (*Gateway, error) {
+func NewGateway(services []config.ServiceConfig, assetCache *cache.DualTierCache, tel *Telemetry) (*Gateway, error) {
 	gw := &Gateway{
-		services: services,
-		servers:  make([]*http.Server, 0, len(services)),
-		proxies:  make([]*StreamProxy, 0, len(services)),
-		cache:    assetCache,
+		services:  services,
+		servers:   make([]*http.Server, 0, len(services)),
+		proxies:   make([]*StreamProxy, 0, len(services)),
+		cache:     assetCache,
+		telemetry: tel,
 	}
 
 	for _, svc := range services {
-		rp, err := NewStreamProxy(svc.Name, svc.UpstreamURL, assetCache)
+		rp, err := NewStreamProxy(svc.Name, svc.UpstreamURL, assetCache, tel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize proxy for %s (%s): %w", svc.Name, svc.UpstreamURL, err)
 		}
@@ -48,6 +50,10 @@ func NewGateway(services []config.ServiceConfig, assetCache *cache.DualTierCache
 
 // Start runs all service proxy listeners concurrently until ctx is canceled.
 func (gw *Gateway) Start(ctx context.Context) error {
+	if gw.telemetry != nil {
+		gw.telemetry.StartHeartbeat(ctx, 5*time.Minute)
+	}
+
 	var wg sync.WaitGroup
 
 	for i, server := range gw.servers {

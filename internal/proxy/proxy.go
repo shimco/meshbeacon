@@ -45,14 +45,22 @@ var defaultBufferPool = newBufferPool()
 
 // StreamProxy handles forwarding client media streams and API requests to the upstream Tailscale peer.
 type StreamProxy struct {
-	name   string
-	target *url.URL
-	proxy  *httputil.ReverseProxy
-	cache  *cache.DualTierCache
+	name      string
+	target    *url.URL
+	proxy     *httputil.ReverseProxy
+	cache     *cache.DualTierCache
+	telemetry *Telemetry
+}
+
+func clientIP(r *http.Request) string {
+	if ip, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return ip
+	}
+	return r.RemoteAddr
 }
 
 // NewStreamProxy initializes a hardened reverse proxy pointing to the target URL.
-func NewStreamProxy(name, targetURL string, assetCache *cache.DualTierCache) (*StreamProxy, error) {
+func NewStreamProxy(name, targetURL string, assetCache *cache.DualTierCache, tel *Telemetry) (*StreamProxy, error) {
 	u, err := url.Parse(targetURL)
 	if err != nil {
 		return nil, err
@@ -83,8 +91,8 @@ func NewStreamProxy(name, targetURL string, assetCache *cache.DualTierCache) (*S
 		originalDirector(req)
 		req.Host = u.Host
 		req.Header.Set("X-Forwarded-Host", req.Header.Get("Host"))
-		if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-			req.Header.Set("X-Real-IP", clientIP)
+		if cIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+			req.Header.Set("X-Real-IP", cIP)
 		}
 	}
 
@@ -94,21 +102,26 @@ func NewStreamProxy(name, targetURL string, assetCache *cache.DualTierCache) (*S
 	}
 
 	return &StreamProxy{
-		name:   name,
-		target: u,
-		proxy:  rp,
-		cache:  assetCache,
+		name:      name,
+		target:    u,
+		proxy:     rp,
+		cache:     assetCache,
+		telemetry: tel,
 	}, nil
 }
 
 // ServeHTTP handles incoming requests, serving static artwork from cache and streaming video through buffers.
 func (sp *StreamProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ip := clientIP(r)
+
 	// Intercept static artwork requests if caching is enabled
 	if sp.cache != nil && cache.IsCacheableAsset(sp.name, r.Method, r.URL.Path) {
 		cacheKey := cache.CacheKey(sp.name, r.URL.Path, r.URL.RawQuery)
 
 		// 1. Check Cache HIT
 		if item, ok := sp.cache.Get(cacheKey); ok {
+			sp.telemetry.Record(sp.name, ip, r.Method, r.URL.Path, "HIT")
+
 			// Conditional GET via ETag (304 Not Modified)
 			if match := r.Header.Get("If-None-Match"); match != "" && match == item.ETag {
 				w.Header().Set("X-Meshbeacon-Cache", "HIT")
@@ -130,6 +143,8 @@ func (sp *StreamProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 2. Cache MISS: stream upstream response through capture wrapper
+		sp.telemetry.Record(sp.name, ip, r.Method, r.URL.Path, "MISS")
+
 		crw := &cachingResponseWriter{
 			ResponseWriter: w,
 			maxCapture:     5 * 1024 * 1024, // 5MB max per image asset
@@ -147,6 +162,7 @@ func (sp *StreamProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Direct stream proxy (video chunks, API calls, WebSockets)
+	sp.telemetry.Record(sp.name, ip, r.Method, r.URL.Path, "STREAM")
 	sp.proxy.ServeHTTP(w, r)
 }
 

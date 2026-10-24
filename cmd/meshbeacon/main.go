@@ -39,6 +39,7 @@ func main() {
 		cacheRAM         = flag.String("cache-ram", getEnv("CACHE_RAM", "auto"), "Asset cache RAM size ('auto', '64MB', 'off')")
 		cacheDir         = flag.String("cache-dir", getEnv("CACHE_DIR", ""), "Optional persistent disk cache directory (default off)")
 		cacheDisk        = flag.String("cache-disk-size", getEnv("CACHE_DISK_SIZE", "auto"), "Max disk cache size if cache-dir is enabled ('auto', '2GB')")
+		accessLog        = flag.Bool("access-log", false, "Log each incoming gateway request to stdout in real-time (default false to prevent SD-card wear)")
 		healthCheck      = flag.Bool("health-check", false, "Run health check against configured services and exit")
 		clearCache       = flag.Bool("clear-cache", false, "Clear all cached assets from disk and exit")
 		showVersion      = flag.Bool("version", false, "Print Meshbeacon version and exit")
@@ -213,8 +214,9 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	// 6. Start Multi-Service HTTP Streaming Gateway
-	gw, err := proxy.NewGateway(cfg.Services, assetCache)
+	// 6. Start Multi-Service HTTP Streaming Gateway with in-memory low-wear telemetry
+	tel := proxy.NewTelemetry(*accessLog)
+	gw, err := proxy.NewGateway(cfg.Services, assetCache, tel)
 	if err != nil {
 		log.Fatalf("Failed to initialize gateway: %v", err)
 	}
