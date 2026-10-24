@@ -259,13 +259,13 @@ While **Jellyfin** works automatically via UDP 7359 broadcasts without any serve
    ```text
    http://<meshbeacon-lan-ip>:32400
    ```
-   *(If you also connect directly to your server over Tailscale/WireGuard on your laptop or phone, comma-separate both URLs so direct mesh connections continue to work on the road: `http://100.103.61.68:32400,http://192.168.100.2:32400`)*
-4. In **LAN Networks**, define your local home network (and optionally your mesh VPN subnet):
+   *(If you also connect directly to your server over Tailscale/WireGuard on your laptop or phone, comma-separate both URLs so direct mesh connections continue to work on the road: `http://100.103.61.68:32400, http://192.168.100.2:32400`)*
+4. In **LAN Networks**, I prefer to define my local home network too (and mesh VPN subnet) with a broad /16 range to cover typical local home ip's making sure Plex knows it is local and not remote on all the networks I run meshbeacon on:
    ```text
    192.168.0.0/255.255.0.0,100.0.0.0/255.0.0.0
    ```
-   * **Why this matters**: Plex treats any IP outside its immediate subnet as "Remote", which enforces artificial bandwidth throttling and forces video transcoding down to 2 Mbps. Adding your home LAN range (`192.168.0.0/255.255.0.0`) tells Plex that Meshbeacon is local, enabling **uncompressed Direct Play by default**.
-   * **Direct Play vs. Transcoding**: This does *not* disable transcoding when you actually need it. If an older Smart TV cannot decode a specific video codec (e.g., AV1 or HEVC) or audio track (TrueHD/DTS), or if a client selects "Auto" quality, Plex will still transcode dynamically. However, it will do so based on actual client hardware capability and screen needs, rather than being forced into an artificial 2 Mbps cloud relay bottleneck.
+   * **Why this matters**: Plex treats any IP outside its immediate subnet as "Remote", which enforces artificial bandwidth throttling and forces video transcoding down to 2 Mbps. Adding my home LAN range (`192.168.0.0/255.255.0.0`) tells Plex that Meshbeacon is local, enabling **uncompressed Direct Play by default**.
+   * **Direct Play vs. Transcoding**: This does *not* disable transcoding when you actually need it. If an older Smart TV cannot decode a specific video codec (e.g., AV1 or HEVC) or audio track (TrueHD/DTS), or if a client selects "Auto" quality, Plex will still transcode dynamically. However, it will do so based on actual client hardware capability and screen needs, rather than being forced to a lower quality by Plex.
    * **Bonus**: Adding your mesh network range (Tailscale `100.0.0.0/255.0.0.0` or WireGuard `10.0.0.0/255.0.0.0`) ensures your phone and laptop also get unthrottled direct playback when running VPN clients away from home.
 5. Click **Save Changes**.
 
@@ -278,7 +278,7 @@ Open media on your Smart TV or phone app. In the playback HUD under **Playback I
 
 ## 🧪 Hardware Compatibility & Tested Environments
 
-Meshbeacon is written in pure Go with zero external runtime dependencies (`CGO_ENABLED=0`). We believe in being transparent about which environments have been physically validated versus those currently in community testing:
+Meshbeacon is written in pure Go with zero external runtime dependencies (`CGO_ENABLED=0`). Here's a transparent list of which environments have been physically validated versus those currently in community testing:
 
 | Environment | Hardware / OS | Architecture | Status | Validation Notes |
 | :--- | :--- | :--- | :--- | :--- |
@@ -291,7 +291,7 @@ Meshbeacon is written in pure Go with zero external runtime dependencies (`CGO_E
 
 > [!TIP]
 > **Help Validate Other Hardware!**  
-> If you are running Meshbeacon on an OpenWrt router, Orange Pi, Rockchip SBC, Proxmox LXC, or an older Raspberry Pi, please [open a Discussion](https://github.com/shimco/meshbeacon/discussions) or Issue with your test notes—we'd love to add your hardware setup to the verified list!
+> If you are running Meshbeacon on an OpenWrt router, Orange Pi, Rockchip SBC, Proxmox LXC, or an older Raspberry Pi, please [open a Discussion](https://github.com/shimco/meshbeacon/discussions) or Issue with your test notes - I would love to add your hardware setup to the verified list!
 
 ---
 
