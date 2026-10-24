@@ -20,7 +20,7 @@ import (
 	"github.com/shimco/meshbeacon/internal/proxy"
 )
 
-var version = "v0.8.1"
+var version = "v0.8.2"
 
 func getEnv(key, defaultVal string) string {
 	if val := os.Getenv(key); val != "" {
@@ -33,9 +33,9 @@ func main() {
 	var (
 		configFile       = flag.String("config", getEnv("CONFIG_FILE", ""), "Path to JSON configuration file")
 		advertiseHost    = flag.String("advertise-host", getEnv("ADVERTISE_HOST", "auto"), "Local host/IP advertised to LAN clients ('auto' to detect)")
-		upstreamJellyfin = flag.String("jellyfin", getEnv("UPSTREAM_JELLYFIN", ""), "Upstream Jellyfin URL (e.g. http://mediaserver:8096)")
-		upstreamPlex     = flag.String("plex", getEnv("UPSTREAM_PLEX", ""), "Upstream Plex URL (e.g. http://mediaserver:32400)")
-		upstreamImmich   = flag.String("immich", getEnv("UPSTREAM_IMMICH", ""), "Upstream Immich URL (e.g. http://mediaserver:2283)")
+		upstreamJellyfin = flag.String("jellyfin", getEnv("UPSTREAM_JELLYFIN", ""), "Upstream Jellyfin URL (e.g. http://media-server:8096)")
+		upstreamPlex     = flag.String("plex", getEnv("UPSTREAM_PLEX", ""), "Upstream Plex URL (e.g. http://media-server:32400)")
+		upstreamImmich   = flag.String("immich", getEnv("UPSTREAM_IMMICH", ""), "Upstream Immich URL (e.g. http://media-server:2283)")
 		cacheRAM         = flag.String("cache-ram", getEnv("CACHE_RAM", "auto"), "Asset cache RAM size ('auto', '64MB', 'off')")
 		cacheDir         = flag.String("cache-dir", getEnv("CACHE_DIR", ""), "Optional persistent disk cache directory (default off)")
 		cacheDisk        = flag.String("cache-disk-size", getEnv("CACHE_DISK_SIZE", "auto"), "Max disk cache size if cache-dir is enabled ('auto', '2GB')")
