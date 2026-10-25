@@ -5,7 +5,19 @@ services:
     # build: . # Uncomment to build locally from source
     container_name: meshbeacon
     restart: unless-stopped
+    # host network mode is required for UDP broadcast discovery (7359/32414) and mDNS (5353)
     network_mode: host
     command: ["-config", "/etc/meshbeacon/meshbeacon.json"]
     volumes:
-      - ./meshbeacon.json:/etc/meshbeacon/meshbeacon.json:ro
+      # Mounted read-write so configuration edits saved via the Web UI (:7350) persist
+      - ./meshbeacon.json:/etc/meshbeacon/meshbeacon.json:rw
+      # Optional: Persistent asset artwork cache directory (SSD/NVMe recommended)
+      # - /var/cache/meshbeacon:/var/cache/meshbeacon:rw
+    # Exposed Ports via host network:
+    #   - 7350/tcp:  Embedded Web Dashboard & Setup Portal
+    #   - 8096/tcp:  Jellyfin LAN Gateway Proxy
+    #   - 32400/tcp: Plex LAN Gateway Proxy
+    #   - 2283/tcp:  Immich Photos LAN Gateway Proxy
+    #   - 7359/udp:  Jellyfin LAN Discovery Probes
+    #   - 32414/udp: Plex GDM Discovery Probes
+    #   - 5353/udp:  Multicast DNS / Bonjour (Apple TV / Android TV)

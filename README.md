@@ -184,21 +184,33 @@ Meshbeacon is written in pure Go with zero runtime dependencies. Here is the ver
 | **Linux Server** | Ubuntu Server 24.04 LTS | `amd64` (x86_64) | 🟢 **Verified** | Bare-metal (`systemd`), APT package (`.deb`), and Docker Compose |
 | **Apple Mac** | macOS 15 Sequoia | `arm64` (Apple Silicon) | 🟢 **Verified** | Standalone binary and Homebrew Tap (`brew services` background daemon) |
 | **Docker / Compose** | Docker 26+ / Compose 2.26+ | `amd64`, `arm64` | 🟢 **Verified** | Official multi-arch GHCR image with self-healing healthchecks |
-| **Raspberry Pi** | Raspberry Pi 4 (Debian 12 / RPi OS) | `arm64` | 🟡 **Active Testing** | Tested over Tailscale mesh network |
+| **Raspberry Pi** | Raspberry Pi 4 (Debian 12 / RPi OS) | `arm64` | 🟢 **Verified** | Tested over Tailscale mesh network; Docker and standalone service |
 | **OpenWrt Router** | GL.iNet Beryl AX (MT7981 / Filogic 820) | `arm64` (aarch64) | 🟢 **Verified** | Turnkey installer, native procd background service, and automated RAM cache scaling |
 
 > [!TIP]
-> **Help Validate Other Hardware!**  
-> If you are running Meshbeacon on an OpenWrt router, Orange Pi, Rockchip SBC, Proxmox LXC, or an older Raspberry Pi, please [open a Discussion](https://github.com/shimco/meshbeacon/discussions) or Issue with your test notes. I would love to add your hardware setup to the verified list!
+> **Help Validate Client Devices & Other Hardware!**  
+> I have personally verified Meshbeacon across multiple host environments (Ubuntu x86_64, Apple Silicon Mac, Raspberry Pi 4, and GL.iNet Beryl AX OpenWrt travel router). However, **I don't personally own an Apple TV, Roku device, or every brand of Smart TV (LG webOS, Samsung Tizen), nor e-ink book readers (Kobo, Kindle, BOOX)**.
+> 
+> I would love community help testing and building a verified matrix for:
+> * **Streaming Boxes & TVs:** Apple TV (Swiftfin / Infuse), Roku, Fire TV, LG webOS, Samsung Tizen.
+> * **E-Readers & Reading Apps:** KOReader on Kobo/Kindle/BOOX, Kavita, and Calibre OPDS feeds.
+> * **Self-Hosted Companion Apps:** Testing local discovery and asset caching with Immich, Mealie, Audiobookshelf, and Navidrome.
+> * **Edge Hardware:** Orange Pi, Rockchip SBCs, older Raspberry Pis, or other OpenWrt router chipsets.
+> 
+> If you have tested Meshbeacon with any of these devices or apps, please [open a Discussion](https://github.com/shimco/meshbeacon/discussions) or submit an Issue with your setup notes so we can expand our verified list!
 
 ---
 
-## Privacy & Zero Telemetry
+## Privacy & Network Disclosures
 
-Meshbeacon is 100% private and offline-first:
-* **Zero external network calls**: It never phones home, collects analytics, or checks external licensing servers.
-* **Low-wear logging**: Access logs are kept in a local in-memory RAM ring buffer by default to prevent burning out SD cards and flash storage.
-* All video traffic and metadata travel strictly between your local devices and your private upstream server.
+Meshbeacon is 100% private, open source, and offline-first:
+* **Zero Telemetry or Tracking:** Meshbeacon contains zero tracking pixels, analytics SDKs, user identifiers, or device fingerprinting. It never tracks what media you stream or which apps you use.
+* **Low-Wear In-Memory Logging:** Access traces and live console logs are held strictly in a local volatile RAM ring buffer, preventing SD-card and flash wear on edge hardware.
+* **Local Data Path:** All media video chunks, tokens, and discovery payloads transit directly and strictly between your local LAN clients and your designated upstream server.
+* **Release & Update Network Calls:**
+  - When clicking "Check for Updates" or running `meshbeacon -check-update`, Meshbeacon makes a single anonymous HTTP GET request to the public GitHub Releases API (`api.github.com/repos/shimco/meshbeacon/releases/latest`) using a standard `meshbeacon/<version>` User-Agent header.
+  - Automated daily checks are optional and disabled by default (`"auto_update": false`).
+  - In air-gapped or offline networks, Meshbeacon operates fully without internet connectivity.
 
 ---
 

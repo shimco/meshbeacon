@@ -150,6 +150,22 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.Cache.DiskDir != "" {
+		clean := filepath.Clean(strings.TrimSpace(c.Cache.DiskDir))
+		if !filepath.IsAbs(clean) {
+			return fmt.Errorf("cache.disk_dir %q must be an absolute path", c.Cache.DiskDir)
+		}
+		forbidden := []string{
+			"/", "/bin", "/sbin", "/usr", "/usr/bin", "/usr/sbin", "/etc", "/root",
+			"/boot", "/sys", "/proc", "/dev", "/lib", "/lib64", "/var", "/run",
+		}
+		for _, f := range forbidden {
+			if clean == f {
+				return fmt.Errorf("cache.disk_dir cannot be set to critical system directory %q", clean)
+			}
+		}
+	}
+
 	return nil
 }
 

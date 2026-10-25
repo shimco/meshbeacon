@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/shimco/meshbeacon/internal/config"
+	"github.com/shimco/meshbeacon/internal/logring"
 )
 
 func TestAdminEndpoints(t *testing.T) {
@@ -18,7 +19,9 @@ func TestAdminEndpoints(t *testing.T) {
 		Services:      []config.ServiceConfig{},
 	}
 
-	srv := NewServer(cfg, "", "v0.8.2", nil, nil, nil)
+	ring := logring.New(10)
+	_, _ = ring.Write([]byte("test log entry\n"))
+	srv := NewServer(cfg, "", "v0.8.4", nil, nil, ring, nil)
 
 	// 1. Test Index
 	rec := httptest.NewRecorder()

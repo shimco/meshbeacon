@@ -283,6 +283,13 @@ func (d *DiskTier) pruneLocked(targetBytes int64) {
 func (d *DiskTier) Clear() (int, int64, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.dir == "" {
+		return 0, 0, nil
+	}
+	clean := filepath.Clean(d.dir)
+	if clean == "/" || clean == "." {
+		return 0, 0, fmt.Errorf("refusing to purge root directory %q", clean)
+	}
 
 	var count int
 	var freed int64

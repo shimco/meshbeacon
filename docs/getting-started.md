@@ -165,6 +165,10 @@ meshbeacon -update
 
 *(Note: On Docker and package-managed installs, Meshbeacon detects its containerized environment and prompts you to update via `docker compose pull` or `apt`.)*
 
+> [!NOTE]
+> **Privacy & Network Transparency:**
+> Update checks query the public GitHub Releases API (`api.github.com/repos/shimco/meshbeacon/releases/latest`) anonymously over standard HTTPS with zero tokens or tracking telemetry. Automatic daily checks are disabled by default (`"auto_update": false`), and Meshbeacon runs 100% offline in air-gapped homelabs.
+
 ---
 
 ## ⚙️ Configuration Reference (`meshbeacon.json`)

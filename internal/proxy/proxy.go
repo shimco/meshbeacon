@@ -88,9 +88,15 @@ func NewStreamProxy(name, targetURL string, assetCache *cache.DualTierCache, tel
 
 	originalDirector := rp.Director
 	rp.Director = func(req *http.Request) {
+		clientHost := req.Host
+		if clientHost == "" {
+			clientHost = req.Header.Get("Host")
+		}
 		originalDirector(req)
 		req.Host = u.Host
-		req.Header.Set("X-Forwarded-Host", req.Header.Get("Host"))
+		if clientHost != "" {
+			req.Header.Set("X-Forwarded-Host", clientHost)
+		}
 		if cIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
 			req.Header.Set("X-Real-IP", cIP)
 		}

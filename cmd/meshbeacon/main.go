@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"os"
@@ -18,12 +19,13 @@ import (
 	"github.com/shimco/meshbeacon/internal/config"
 	"github.com/shimco/meshbeacon/internal/discovery"
 	"github.com/shimco/meshbeacon/internal/health"
+	"github.com/shimco/meshbeacon/internal/logring"
 	"github.com/shimco/meshbeacon/internal/netutil"
 	"github.com/shimco/meshbeacon/internal/proxy"
 	"github.com/shimco/meshbeacon/internal/updater"
 )
 
-var version = "v0.8.3"
+var version = "v0.8.4"
 
 func getEnv(key, defaultVal string) string {
 	if val := os.Getenv(key); val != "" {
@@ -67,6 +69,9 @@ func main() {
 		showVersion      = flag.Bool("version", false, "Print Meshbeacon version and exit")
 	)
 	flag.Parse()
+
+	logRing := logring.New(250)
+	log.SetOutput(io.MultiWriter(os.Stderr, logRing))
 
 	if *showVersion {
 		fmt.Printf("meshbeacon %s\n", version)
@@ -201,11 +206,12 @@ func main() {
 	defer cancel()
 
 	var (
-		wg         sync.WaitGroup
-		gwCtx      context.Context
-		gwCancel   context.CancelFunc
-		assetCache *cache.DualTierCache
-		tel        = proxy.NewTelemetry(*accessLog)
+		wg          sync.WaitGroup
+		gwCtx       context.Context
+		gwCancel    context.CancelFunc
+		assetCache  *cache.DualTierCache
+		adminServer *admin.Server
+		tel         = proxy.NewTelemetry(*accessLog)
 	)
 
 	// Apply CLI flag overrides to cache config
@@ -226,8 +232,8 @@ func main() {
 		}
 		gwCtx, gwCancel = context.WithCancel(ctx)
 
-		// Initialize Cache if not already active
-		if assetCache == nil && currentCfg.Cache.Enabled {
+		// Initialize or Re-initialize Cache
+		if currentCfg.Cache.Enabled {
 			hasDisk := currentCfg.Cache.DiskDir != ""
 			var diskBytes int64
 			if hasDisk {
@@ -261,10 +267,14 @@ func main() {
 					defaultTTL = 90 * 24 * time.Hour
 				}
 				ttl := cache.ParseTTL(currentCfg.Cache.TTL, defaultTTL)
-				assetCache, err = cache.NewDualTierCache(ramBytes, currentCfg.Cache.DiskDir, diskBytes, ttl)
+				newCache, err := cache.NewDualTierCache(ramBytes, currentCfg.Cache.DiskDir, diskBytes, ttl)
 				if err != nil {
 					log.Printf("[Cache Warning] Failed to initialize cache: %v", err)
 				} else {
+					assetCache = newCache
+					if adminServer != nil {
+						adminServer.UpdateCache(assetCache)
+					}
 					ramDesc := cache.FormatSize(ramBytes)
 					if ramBytes == 0 {
 						ramDesc = "disabled (pure disk)"
@@ -278,6 +288,12 @@ func main() {
 						ramDesc, cache.FormatSize(totalRAM), diskDesc, ttlDays)
 				}
 			}
+		} else {
+			assetCache = nil
+			if adminServer != nil {
+				adminServer.UpdateCache(nil)
+			}
+			log.Println("[Asset Cache] Disabled")
 		}
 
 		// Initialize Gateway
@@ -407,7 +423,7 @@ func main() {
 	}
 
 	// 9. Initialize Web Dashboard & Setup Portal
-	adminServer := admin.NewServer(cfg, *configFile, version, assetCache, tel, func(newCfg *config.Config) error {
+	adminServer = admin.NewServer(cfg, *configFile, version, assetCache, tel, logRing, func(newCfg *config.Config) error {
 		log.Println("[Admin] Configuration update received via Web UI.")
 		cfg = newCfg
 		if cfg.IsConfigured() {

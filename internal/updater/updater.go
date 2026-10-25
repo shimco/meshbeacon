@@ -327,9 +327,16 @@ func ExecuteUpdate(ctx context.Context, currentVersion, configPath string) error
 	_ = os.Remove(bakPath)
 	_ = copyFile(exePath, bakPath)
 
-	// Atomic replacement: rename tmp -> exePath (or copy if rename fails across mounts)
+	// Atomic replacement: rename tmp -> exePath (or stage via sibling tmp if across mounts to prevent ETXTBSY)
 	if err := os.Rename(newBinaryPath, exePath); err != nil {
-		if err := copyFile(newBinaryPath, exePath); err != nil {
+		siblingTmp := exePath + ".tmp"
+		_ = os.Remove(siblingTmp)
+		if err := copyFile(newBinaryPath, siblingTmp); err != nil {
+			return fmt.Errorf("failed to stage replacement binary: %w", err)
+		}
+		_ = os.Chmod(siblingTmp, 0755)
+		if err := os.Rename(siblingTmp, exePath); err != nil {
+			_ = os.Remove(siblingTmp)
 			return fmt.Errorf("failed to replace binary %s: %w", exePath, err)
 		}
 	}
