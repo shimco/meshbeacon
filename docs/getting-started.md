@@ -126,13 +126,44 @@ Run Meshbeacon directly on your travel router or home gateway:
 wget -O - https://raw.githubusercontent.com/shimco/meshbeacon/main/install.sh | sh
 ```
 
-The script configures a native OpenWrt `procd` service at `/etc/init.d/meshbeacon` with automated respawn protection (`procd_set_param respawn 3600 5 0`).
+The installer:
+1. Installs the static multi-arch binary to `/usr/bin/meshbeacon`.
+2. Registers a native OpenWrt `procd` service at `/etc/init.d/meshbeacon` with respawn protection and enables it on boot.
+3. Automatically installs a LuCI web menu item under **Services -> Meshbeacon** (linking directly to the embedded dashboard on port 7350).
+4. Automatically starts the service.
 
-To start:
-```sh
-/etc/init.d/meshbeacon enable
-/etc/init.d/meshbeacon start
+On initial boot, if upstream media servers have not been configured yet, Meshbeacon enters **Standby Mode** and serves a setup wizard at `http://<router-ip>:7350` or `http://meshbeacon.local:7350`.
+
+---
+
+## 🖥️ Web Dashboard & Standby Setup Mode
+
+Meshbeacon includes a zero-dependency, embedded web dashboard running on port `7350` (`http://meshbeacon.local:7350`):
+
+* **Standby Mode (First-Run Wizard)**: If started with an unconfigured or template configuration, Meshbeacon holds proxy traffic dormant and displays a prominent setup banner and web form to configure your upstream server in seconds.
+* **Active Mode**: Live service status, real-time cache hit ratios, bandwidth metrics, and update notifications.
+* **Config Editor**: Edit and persist configuration directly from the browser with automatic atomic reload.
+
+---
+
+## 🛡️ Configuration Validation & Auto-Updates
+
+### Pre-flight Config Testing
+Test configuration syntax and port availability before deploying:
+```bash
+meshbeacon -test-config -config /etc/meshbeacon/meshbeacon.json
 ```
+
+### Checking for Updates
+```bash
+# Check if a newer version is available on GitHub
+meshbeacon -check-update
+
+# Automatically download, verify SHA-256, test config, and safely update standalone binary
+meshbeacon -update
+```
+
+*(Note: On Docker and package-managed installs, Meshbeacon detects its containerized environment and prompts you to update via `docker compose pull` or `apt`.)*
 
 ---
 
@@ -140,6 +171,8 @@ To start:
 
 ```json
 {
+  "schema_version": 1,
+  "admin_port": 7350,
   "advertise_addr": "auto",
   "cache": {
     "enabled": true,

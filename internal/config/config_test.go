@@ -129,3 +129,66 @@ func TestDefaultConfigWithImmich(t *testing.T) {
 		t.Errorf("Unexpected immich discovery: %+v", immichSvc.Discovery)
 	}
 }
+
+func TestIsConfigured(t *testing.T) {
+	// Empty services
+	emptyCfg := &Config{}
+	if emptyCfg.IsConfigured() {
+		t.Errorf("Empty config should not be considered configured")
+	}
+
+	// Template placeholder services
+	placeholderCfg := &Config{
+		Services: []ServiceConfig{
+			{Name: "jellyfin", LocalPort: 8096, UpstreamURL: "http://media-server:8096"},
+			{Name: "plex", LocalPort: 32400, UpstreamURL: "http://media-server.your-tailnet.ts.net:32400"},
+		},
+	}
+	if placeholderCfg.IsConfigured() {
+		t.Errorf("Placeholder config should not be considered configured")
+	}
+
+	// Valid live service
+	validCfg := &Config{
+		Services: []ServiceConfig{
+			{Name: "jellyfin", LocalPort: 8096, UpstreamURL: "http://100.103.61.68:8096"},
+		},
+	}
+	if !validCfg.IsConfigured() {
+		t.Errorf("Valid upstream URL should be considered configured")
+	}
+}
+
+func TestValidateConfig(t *testing.T) {
+	valid := &Config{
+		AdminPort: 7350,
+		Services: []ServiceConfig{
+			{Name: "jellyfin", LocalPort: 8096, UpstreamURL: "http://100.64.0.1:8096"},
+		},
+	}
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("Expected valid config to pass validation, got: %v", err)
+	}
+
+	// Port collision with AdminPort
+	portCollision := &Config{
+		AdminPort: 7350,
+		Services: []ServiceConfig{
+			{Name: "bad-service", LocalPort: 7350, UpstreamURL: "http://100.64.0.1:7350"},
+		},
+	}
+	if err := portCollision.Validate(); err == nil {
+		t.Errorf("Expected port collision error between service and admin_port")
+	}
+
+	// Invalid upstream URL format
+	badURL := &Config{
+		AdminPort: 7350,
+		Services: []ServiceConfig{
+			{Name: "bad-url", LocalPort: 8080, UpstreamURL: "ftp://100.64.0.1:8080"},
+		},
+	}
+	if err := badURL.Validate(); err == nil {
+		t.Errorf("Expected error for non-http(s) upstream URL")
+	}
+}

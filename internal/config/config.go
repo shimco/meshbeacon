@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -69,9 +70,134 @@ type CacheConfig struct {
 
 // Config represents the complete Meshbeacon runtime configuration.
 type Config struct {
-	AdvertiseAddr string          `json:"advertise_addr"` // e.g. "http://192.168.1.100" or "auto"
+	SchemaVersion int             `json:"schema_version,omitempty"` // Configuration schema version (e.g. 1)
+	AdminPort     int             `json:"admin_port,omitempty"`     // Web dashboard & setup port (default: 7350)
+	AutoUpdate    bool            `json:"auto_update,omitempty"`    // Enable daily automatic updates on standalone installs
+	AdvertiseAddr string          `json:"advertise_addr"`           // e.g. "http://192.168.1.100" or "auto"
 	Cache         CacheConfig     `json:"cache"`
 	Services      []ServiceConfig `json:"services"`
+}
+
+// IsPlaceholderURL checks if a target upstream URL is unconfigured template filler.
+func IsPlaceholderURL(rawURL string) bool {
+	u := strings.TrimSpace(strings.ToLower(rawURL))
+	if u == "" {
+		return true
+	}
+	placeholders := []string{
+		"media-server:8096",
+		"media-server:32400",
+		"media-server.your-tailnet.ts.net",
+		"photos.your-tailnet.ts.net",
+		"audiobooks.your-tailnet.ts.net",
+		"books.your-tailnet.ts.net",
+		"recipes.your-tailnet.ts.net",
+		"cups.your-tailnet.ts.net",
+		"example.com",
+		"your-tailnet",
+		"http://media-server",
+		"https://media-server",
+	}
+	for _, p := range placeholders {
+		if strings.Contains(u, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsConfigured returns true if at least one service has a genuine, non-placeholder upstream target.
+func (c *Config) IsConfigured() bool {
+	if len(c.Services) == 0 {
+		return false
+	}
+	for _, s := range c.Services {
+		if !IsPlaceholderURL(s.UpstreamURL) {
+			return true
+		}
+	}
+	return false
+}
+
+// Validate checks for structural, port, and schema errors in the configuration.
+func (c *Config) Validate() error {
+	if c.AdminPort == 0 {
+		c.AdminPort = 7350
+	} else if c.AdminPort < 1 || c.AdminPort > 65535 {
+		return fmt.Errorf("invalid admin_port: %d (must be between 1 and 65535)", c.AdminPort)
+	}
+
+	usedPorts := make(map[int]string)
+	usedPorts[c.AdminPort] = "admin/dashboard"
+
+	for i, s := range c.Services {
+		if strings.TrimSpace(s.Name) == "" {
+			return fmt.Errorf("services[%d]: service name cannot be empty", i)
+		}
+		if s.LocalPort < 1 || s.LocalPort > 65535 {
+			return fmt.Errorf("services[%d] (%s): invalid local_port %d", i, s.Name, s.LocalPort)
+		}
+		if owner, exists := usedPorts[s.LocalPort]; exists {
+			return fmt.Errorf("services[%d] (%s): local_port %d conflicts with %s", i, s.Name, s.LocalPort, owner)
+		}
+		usedPorts[s.LocalPort] = s.Name
+
+		if strings.TrimSpace(s.UpstreamURL) != "" {
+			trimmed := strings.TrimSpace(s.UpstreamURL)
+			if !strings.HasPrefix(trimmed, "http://") && !strings.HasPrefix(trimmed, "https://") {
+				return fmt.Errorf("services[%d] (%s): upstream_url %q must begin with http:// or https://", i, s.Name, s.UpstreamURL)
+			}
+		}
+	}
+
+	return nil
+}
+
+// SaveConfig atomically writes the configuration to disk.
+func SaveConfig(filePath string, cfg *Config) error {
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("cannot save invalid config: %w", err)
+	}
+
+	if cfg.SchemaVersion == 0 {
+		cfg.SchemaVersion = 1
+	}
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("could not marshal config to json: %w", err)
+	}
+	data = append(data, '\n')
+
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("could not create config directory %s: %w", dir, err)
+	}
+
+	tmpFile, err := os.CreateTemp(dir, "meshbeacon-*.json.tmp")
+	if err != nil {
+		return fmt.Errorf("could not create temporary config file: %w", err)
+	}
+	tmpName := tmpFile.Name()
+	defer os.Remove(tmpName)
+
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("could not write temporary config: %w", err)
+	}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("could not sync temporary config: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("could not close temporary config: %w", err)
+	}
+
+	if err := os.Rename(tmpName, filePath); err != nil {
+		return fmt.Errorf("could not atomically replace %s: %w", filePath, err)
+	}
+
+	return nil
 }
 
 // LoadConfig reads configuration from a JSON file path.
@@ -83,6 +209,8 @@ func LoadConfig(filePath string) (*Config, error) {
 
 	var cfg Config
 	// Defaults
+	cfg.SchemaVersion = 1
+	cfg.AdminPort = 7350
 	cfg.Cache.Enabled = true
 	cfg.Cache.RAMSize = "auto"
 	cfg.Cache.TTL = "auto"
@@ -91,6 +219,12 @@ func LoadConfig(filePath string) (*Config, error) {
 		return nil, fmt.Errorf("invalid json in config file: %w", err)
 	}
 
+	if cfg.SchemaVersion == 0 {
+		cfg.SchemaVersion = 1
+	}
+	if cfg.AdminPort == 0 {
+		cfg.AdminPort = 7350
+	}
 	if cfg.Cache.RAMSize == "" {
 		cfg.Cache.RAMSize = "auto"
 	}

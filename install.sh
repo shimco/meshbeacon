@@ -245,6 +245,8 @@ EOF
   if [ ! -f "${CONFIG_DIR}/meshbeacon.json" ]; then
     cat << 'EOF' > "${CONFIG_DIR}/meshbeacon.json"
 {
+  "schema_version": 1,
+  "admin_port": 7350,
   "advertise_addr": "auto",
   "cache": {
     "enabled": true,
@@ -269,8 +271,45 @@ EOF
     log "Created template configuration at ${CONFIG_DIR}/meshbeacon.json"
   fi
 
+  # Setup OpenWrt LuCI web menu integration if LuCI directory is present
+  if [ -d /usr/share/luci/menu.d ]; then
+    cat << 'EOF' > /usr/share/luci/menu.d/meshbeacon.json
+{
+  "admin/services/meshbeacon": {
+    "title": "Meshbeacon",
+    "action": {
+      "type": "view",
+      "path": "meshbeacon"
+    },
+    "order": 90
+  }
+}
+EOF
+    mkdir -p /www/luci-static/resources/view
+    cat << 'EOF' > /www/luci-static/resources/view/meshbeacon.js
+'use strict';
+'require view';
+
+return view.extend({
+    render: function() {
+        var host = window.location.hostname;
+        var url = 'http://' + host + ':7350';
+        return E('div', { class: 'cbi-map' }, [
+            E('h2', {}, _('Meshbeacon Gateway & Discovery')),
+            E('div', { class: 'cbi-map-descr' }, _('Meshbeacon media streaming gateway, asset cache, and autodiscovery beacon are running on port 7350.')),
+            E('div', { style: 'margin-top: 1.5em;' }, [
+                E('a', { class: 'btn cbi-button cbi-button-action', href: url, target: '_blank' }, _('Open Meshbeacon Dashboard ↗'))
+            ])
+        ]);
+    }
+});
+EOF
+    log "Installed LuCI web menu integration under Services -> Meshbeacon"
+  fi
+
   /etc/init.d/meshbeacon enable
-  log "OpenWrt service installed! Start with: /etc/init.d/meshbeacon start"
+  /etc/init.d/meshbeacon restart >/dev/null 2>&1 || /etc/init.d/meshbeacon start
+  log "OpenWrt service enabled and running! Web Dashboard: http://meshbeacon.local:7350 or port 7350 on router IP"
   exit 0
 fi
 
@@ -287,6 +326,8 @@ if [ "${TARGET_OS}" = "linux" ]; then
   if [ ! -f "${CONFIG_DIR}/meshbeacon.json" ]; then
     run_as_root tee "${CONFIG_DIR}/meshbeacon.json" > /dev/null << 'EOF'
 {
+  "schema_version": 1,
+  "admin_port": 7350,
   "advertise_addr": "auto",
   "cache": {
     "enabled": true,

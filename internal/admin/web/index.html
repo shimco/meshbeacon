@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meshbeacon — LAN Media Gateway & Discovery</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 26, 43, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #f0f4f8;
+      --text-muted: #8a99ad;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.25);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.25);
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.25);
+      --danger: #ef4444;
+      --radius: 12px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 15% 15%, #131d33 0%, var(--bg) 100%);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+      padding: 1.5rem;
+    }
+
+    header {
+      max-width: 1080px;
+      margin: 0 auto 2rem auto;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .brand-icon {
+      font-size: 2rem;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid var(--accent-glow);
+      padding: 0.4rem 0.6rem;
+      border-radius: var(--radius);
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+    .brand-title { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+    .brand-tag { font-size: 0.8rem; color: var(--text-muted); }
+
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .badge {
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: 1px solid transparent;
+    }
+    .badge-active {
+      background: rgba(16, 185, 129, 0.12);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .badge-standby {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.3);
+      animation: pulse-glow 2s infinite ease-in-out;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 var(--warning-glow); }
+      50% { box-shadow: 0 0 16px 2px var(--warning-glow); }
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      flex: 1;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Standby Banner */
+    .standby-hero {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(59, 130, 246, 0.08) 100%);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .standby-hero h2 { font-size: 1.35rem; color: #fbbf24; margin-bottom: 0.5rem; }
+    .standby-hero p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.25rem; }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+    .input-text {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-text:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    .service-checklist {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0 1.5rem 0;
+    }
+    .service-choice {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .service-choice:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .service-choice input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+    .service-choice-label {
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: transform 0.1s, opacity 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      opacity: 0.92;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: none;
+    }
+
+    /* Grid layout for stats & services */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 800px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+    }
+
+    .services-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .services-table th {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .services-table td {
+      padding: 0.85rem 0.75rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 0.4rem;
+    }
+    .dot-green { background: var(--success); box-shadow: 0 0 8px var(--success-glow); }
+    .dot-amber { background: var(--warning); box-shadow: 0 0 8px var(--warning-glow); }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 0.9rem;
+    }
+    .stat-label { color: var(--text-muted); }
+    .stat-val { font-weight: 600; }
+
+    footer {
+      max-width: 1080px;
+      margin: 2rem auto 0 auto;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="brand">
+      <div class="brand-icon">🗼</div>
+      <div>
+        <div class="brand-title">Meshbeacon</div>
+        <div class="brand-tag">LAN Media Gateway & Discovery Beacon</div>
+      </div>
+    </a>
+    <div class="header-badges">
+      <span id="mode-badge" class="badge badge-standby">Standby Mode</span>
+      <span id="version-badge" class="badge" style="background: rgba(255,255,255,0.06);">v0.8.3</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Standby Setup Card (shown when unconfigured) -->
+    <section id="standby-card" class="card standby-hero" style="display: none;">
+      <h2>🚀 First-Run Setup Required</h2>
+      <p>Meshbeacon is running in standby mode. Provide your upstream media server address (e.g. Tailscale IP or LAN hostname) and choose which services to bridge into your local LAN.</p>
+
+      <form id="setup-form" onsubmit="handleQuickSetup(event)">
+        <div class="form-group">
+          <label for="server-host">Media Server Upstream Host or IP</label>
+          <input type="text" id="server-host" class="input-text" placeholder="100.103.61.68 or mediaserver.tailnet.ts.net" required>
+        </div>
+
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Select Services to Forward & Advertise</label>
+        <div class="service-checklist">
+          <label class="service-choice">
+            <input type="checkbox" id="svc-jellyfin" checked>
+            <span class="service-choice-label">Jellyfin (:8096, UDP 7359)</span>
+          </label>
+          <label class="service-choice">
+            <input type="checkbox" id="svc-plex" checked>
+            <span class="service-choice-label">Plex (:32400, GDM 32414)</span>
+          </label>
+          <label class="service-choice">
+            <input type="checkbox" id="svc-immich">
+            <span class="service-choice-label">Immich (:2283, Photos)</span>
+          </label>
+          <label class="service-choice">
+            <input type="checkbox" id="svc-audiobookshelf">
+            <span class="service-choice-label">Audiobookshelf (:13378)</span>
+          </label>
+          <label class="service-choice">
+            <input type="checkbox" id="svc-navidrome">
+            <span class="service-choice-label">Navidrome (:4533, Music)</span>
+          </label>
+          <label class="service-choice">
+            <input type="checkbox" id="svc-kavita">
+            <span class="service-choice-label">Kavita (:5000, Books)</span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn">Save & Start Gateway</button>
+      </form>
+    </section>
+
+    <!-- Main Dashboard Grid -->
+    <div class="dashboard-grid">
+      <!-- Active Services List -->
+      <section class="card">
+        <div class="card-title">
+          <span>Active Services</span>
+          <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;" onclick="location.reload()">Refresh</button>
+        </div>
+        <table class="services-table">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Local Port</th>
+              <th>Upstream Target</th>
+              <th>Discovery</th>
+            </tr>
+          </thead>
+          <tbody id="services-tbody">
+            <tr><td colspan="4" style="color: var(--text-muted);">Loading runtime services...</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- System & Cache Stats -->
+      <section style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div class="card">
+          <div class="card-title">Dual-Tier Asset Cache</div>
+          <div class="stat-row">
+            <span class="stat-label">Cache State</span>
+            <span class="stat-val" id="cache-state">Active</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">RAM Cache</span>
+            <span class="stat-val" id="cache-ram">Auto</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Cache Hits</span>
+            <span class="stat-val" id="cache-hits" style="color: var(--success);">-</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Cache Misses</span>
+            <span class="stat-val" id="cache-misses">-</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">System & Updates</div>
+          <div class="stat-row">
+            <span class="stat-label">Node Host</span>
+            <span class="stat-val" id="sys-host">-</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Uptime</span>
+            <span class="stat-val" id="sys-uptime">-</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Version</span>
+            <span class="stat-val" id="sys-version">-</span>
+          </div>
+          <div style="margin-top: 1rem;">
+            <button id="btn-check-update" class="btn btn-secondary" style="width: 100%; justify-content: center;" onclick="checkUpdate()">Check for Updates</button>
+            <div id="update-msg" style="font-size: 0.8rem; margin-top: 0.5rem; text-align: center; color: var(--text-muted);"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    Meshbeacon by <a href="https://github.com/shimco/meshbeacon" target="_blank" rel="noopener">Graham Shimmin</a> • Pure Go Edge Gateway
+  </footer>
+
+  <script>
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+
+        // Update Version & Badges
+        document.getElementById('version-badge').textContent = data.version || 'v0.8.3';
+        document.getElementById('sys-version').textContent = data.version || 'v0.8.3';
+        document.getElementById('sys-host').textContent = data.advertise_addr || 'auto';
+        document.getElementById('sys-uptime').textContent = data.uptime || '-';
+
+        const modeBadge = document.getElementById('mode-badge');
+        const standbyCard = document.getElementById('standby-card');
+
+        if (data.mode === 'standby' || !data.configured) {
+          modeBadge.textContent = 'Standby Mode';
+          modeBadge.className = 'badge badge-standby';
+          standbyCard.style.display = 'block';
+        } else {
+          modeBadge.textContent = 'Active (Discoverable)';
+          modeBadge.className = 'badge badge-active';
+          standbyCard.style.display = 'none';
+        }
+
+        // Render Services Table
+        const tbody = document.getElementById('services-tbody');
+        tbody.innerHTML = '';
+        if (!data.services || data.services.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted); text-align: center; padding: 1.5rem;">No services active. Configure upstream above.</td></tr>';
+        } else {
+          data.services.forEach(s => {
+            const tr = document.createElement('tr');
+            const disc = s.discovery ? (s.discovery.type + (s.discovery.port ? ' :' + s.discovery.port : '')) : 'mDNS';
+            tr.innerHTML = `
+              <td><span class="status-dot dot-green"></span><strong>${s.name}</strong></td>
+              <td>:${s.local_port}</td>
+              <td style="color: var(--text-muted); font-family: monospace;">${s.upstream_url}</td>
+              <td><span class="badge" style="background: rgba(255,255,255,0.06); font-size: 0.75rem;">${disc}</span></td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        // Cache Stats
+        if (data.cache) {
+          document.getElementById('cache-ram').textContent = data.cache.ram_size || 'Auto';
+          document.getElementById('cache-hits').textContent = (data.cache.hits || 0).toLocaleString();
+          document.getElementById('cache-misses').textContent = (data.cache.misses || 0).toLocaleString();
+        }
+      } catch (err) {
+        console.error('Failed to load status:', err);
+      }
+    }
+
+    async function handleQuickSetup(e) {
+      e.preventDefault();
+      const hostInput = document.getElementById('server-host').value.trim();
+      if (!hostInput) return;
+
+      const prefix = (hostInput.startsWith('http://') || hostInput.startsWith('https://')) ? hostInput : 'http://' + hostInput;
+      // Strip trailing port if provided by user
+      const cleanHost = prefix.replace(/:[0-9]+$/, '');
+
+      const services = [];
+      if (document.getElementById('svc-jellyfin').checked) {
+        services.push({
+          name: "jellyfin",
+          local_port: 8096,
+          upstream_url: cleanHost + ":8096",
+          discovery: { type: "jellyfin", port: 7359, server_name: "Jellyfin" }
+        });
+      }
+      if (document.getElementById('svc-plex').checked) {
+        services.push({
+          name: "plex",
+          local_port: 32400,
+          upstream_url: cleanHost + ":32400",
+          discovery: { type: "plex", port: 32414, server_name: "Plex Media Server" }
+        });
+      }
+      if (document.getElementById('svc-immich').checked) {
+        services.push({
+          name: "immich",
+          local_port: 2283,
+          upstream_url: cleanHost + ":2283",
+          discovery: { type: "immich", service: "_immich._tcp", server_name: "Immich Photos", txt: { path: "/api" } }
+        });
+      }
+      if (document.getElementById('svc-audiobookshelf').checked) {
+        services.push({
+          name: "audiobookshelf",
+          local_port: 13378,
+          upstream_url: cleanHost + ":13378",
+          discovery: { type: "audiobookshelf", server_name: "Audiobooks" }
+        });
+      }
+      if (document.getElementById('svc-navidrome').checked) {
+        services.push({
+          name: "navidrome",
+          local_port: 4533,
+          upstream_url: cleanHost + ":4533",
+          discovery: { type: "navidrome", server_name: "Navidrome Music" }
+        });
+      }
+      if (document.getElementById('svc-kavita').checked) {
+        services.push({
+          name: "kavita",
+          local_port: 5000,
+          upstream_url: cleanHost + ":5000",
+          discovery: { type: "kavita", server_name: "Kavita Books" }
+        });
+      }
+
+      const payload = {
+        schema_version: 1,
+        admin_port: 7350,
+        advertise_addr: "auto",
+        cache: { enabled: true, ram_size: "auto", disk_dir: "", disk_size: "auto", ttl: "auto" },
+        services: services
+      };
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const errData = await res.json();
+          alert('Error saving configuration: ' + (errData.error || res.statusText));
+          return;
+        }
+        alert('Configuration saved! Meshbeacon is now live.');
+        loadStatus();
+      } catch (err) {
+        alert('Network error saving configuration: ' + err);
+      }
+    }
+
+    async function checkUpdate() {
+      const msg = document.getElementById('update-msg');
+      msg.textContent = 'Checking GitHub releases...';
+      try {
+        const res = await fetch('/api/update');
+        const data = await res.json();
+        if (data.is_newer) {
+          msg.innerHTML = `<span style="color: #34d399; font-weight: 600;">Update ${data.latest} available!</span> <button class="btn" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-left: 0.5rem;" onclick="triggerUpdate()">Apply</button>`;
+        } else {
+          msg.textContent = 'Meshbeacon is up to date (' + (data.current || '') + ').';
+        }
+      } catch (err) {
+        msg.textContent = 'Could not check updates: ' + err;
+      }
+    }
+
+    async function triggerUpdate() {
+      if (!confirm('Apply update and restart Meshbeacon?')) return;
+      const msg = document.getElementById('update-msg');
+      msg.textContent = 'Applying update...';
+      try {
+        const res = await fetch('/api/update', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          msg.innerHTML = '<span style="color: #34d399;">Update successful! Reloading...</span>';
+          setTimeout(() => location.reload(), 3000);
+        } else {
+          msg.textContent = 'Update error: ' + (data.error || 'Failed');
+        }
+      } catch (err) {
+        msg.textContent = 'Update network error: ' + err;
+      }
+    }
+
+    loadStatus();
+    setInterval(loadStatus, 10000);
+  </script>
+</body>
+</html>
