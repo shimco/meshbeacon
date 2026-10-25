@@ -178,7 +178,7 @@ Meshbeacon is written in pure Go with zero runtime dependencies. Here is the ver
 | **Apple Mac** | macOS 15 Sequoia | `arm64` (Apple Silicon) | 🟢 **Verified** | Standalone binary and Homebrew Tap (`brew services` background daemon) |
 | **Docker / Compose** | Docker 26+ / Compose 2.26+ | `amd64`, `arm64` | 🟢 **Verified** | Official multi-arch GHCR image with self-healing healthchecks |
 | **Raspberry Pi** | Raspberry Pi 4 (Debian 12 / RPi OS) | `arm64` | 🟡 **Active Testing** | Tested over Tailscale mesh network |
-| **OpenWrt Router** | MediaTek Filogic / GL.iNet (Beryl AX / Flint) | `arm64` / `mips` | 🟡 **Community Testing** | POSIX procd service installer tested; seeking community test reports |
+| **OpenWrt Router** | GL.iNet Beryl AX (MT7981 / Filogic 820) | `arm64` (aarch64) | 🟢 **Verified** | Turnkey installer, native procd background service, and automated RAM cache scaling |
 
 > [!TIP]
 > **Help Validate Other Hardware!**  

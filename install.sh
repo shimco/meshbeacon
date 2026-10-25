@@ -121,7 +121,8 @@ esac
 # ------------------------------------------------------------------------------
 # 1. Detect Operating System and Architecture
 # ------------------------------------------------------------------------------
-OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+# shellcheck disable=SC2018,SC2019 # BusyBox tr does not support POSIX character classes by default
+OS="$(uname -s | tr 'A-Z' 'a-z')"
 ARCH="$(uname -m)"
 
 case "${ARCH}" in
