@@ -116,6 +116,14 @@ func (m *MemoryLRU) removeElement(el *list.Element) {
 	delete(m.items, item.Key)
 }
 
+func (m *MemoryLRU) Clear() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.items = make(map[string]*list.Element)
+	m.evict.Init()
+	m.curBytes = 0
+}
+
 func (m *MemoryLRU) Size() (int, int64) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -414,6 +422,16 @@ func (c *DualTierCache) Stats() Stats {
 		RAMItems:  items,
 		RAMBytes:  bytes,
 		DiskBytes: diskBytes,
+	}
+}
+
+// Clear wipes all items from both RAM and Disk cache tiers.
+func (c *DualTierCache) Clear() {
+	if c.ram != nil {
+		c.ram.Clear()
+	}
+	if c.disk != nil {
+		_, _, _ = c.disk.Clear()
 	}
 }
 

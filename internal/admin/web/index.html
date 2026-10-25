@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Meshbeacon — LAN Media Gateway & Discovery</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none'%3E%3Cpath d='M42 22A16 16 0 0 0 42 38M35 15A25 25 0 0 0 35 45M58 22A16 16 0 0 1 58 38M65 15A25 25 0 0 1 65 45' stroke='%2338bdf8' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='30' r='5' fill='%2310b981'/%3E%3Cpolygon points='50,40 34,86 66,86' stroke='%2338bdf8' stroke-width='4' fill='none'/%3E%3C/svg%3E">
   <style>
     :root {
       --bg: #090d16;
@@ -48,17 +49,24 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.85rem;
       text-decoration: none;
       color: var(--text);
     }
-    .brand-icon {
-      font-size: 2rem;
-      background: rgba(59, 130, 246, 0.15);
-      border: 1px solid var(--accent-glow);
-      padding: 0.4rem 0.6rem;
+    .brand-icon-wrap {
+      width: 44px;
+      height: 44px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
       border-radius: var(--radius);
-      box-shadow: 0 4px 12px var(--accent-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px rgba(56, 189, 248, 0.2);
+    }
+    .brand-icon-wrap svg {
+      width: 28px;
+      height: 28px;
     }
     .brand-title { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
     .brand-tag { font-size: 0.8rem; color: var(--text-muted); }
@@ -194,8 +202,8 @@
       color: #fff;
       border: none;
       border-radius: 8px;
-      padding: 0.75rem 1.5rem;
-      font-size: 0.95rem;
+      padding: 0.65rem 1.25rem;
+      font-size: 0.9rem;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
@@ -215,6 +223,14 @@
     .btn-secondary:hover {
       background: rgba(255, 255, 255, 0.12);
       box-shadow: none;
+    }
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
     }
 
     /* Grid layout for stats & services */
@@ -253,7 +269,6 @@
       margin-right: 0.4rem;
     }
     .dot-green { background: var(--success); box-shadow: 0 0 8px var(--success-glow); }
-    .dot-amber { background: var(--warning); box-shadow: 0 0 8px var(--warning-glow); }
 
     .stat-row {
       display: flex;
@@ -279,7 +294,15 @@
 
   <header>
     <a href="/" class="brand">
-      <div class="brand-icon">🗼</div>
+      <div class="brand-icon-wrap">
+        <svg viewBox="0 0 100 100" fill="none">
+          <path d="M 42 22 A 16 16 0 0 0 42 38 M 35 15 A 25 25 0 0 0 35 45" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" />
+          <path d="M 58 22 A 16 16 0 0 1 58 38 M 65 15 A 25 25 0 0 1 65 45" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" />
+          <circle cx="50" cy="30" r="5" fill="#10b981" />
+          <polygon points="50,40 34,86 66,86" stroke="#38bdf8" stroke-width="4" fill="none" />
+          <line x1="41" y1="62" x2="59" y2="62" stroke="#38bdf8" stroke-width="3" />
+        </svg>
+      </div>
       <div>
         <div class="brand-title">Meshbeacon</div>
         <div class="brand-tag">LAN Media Gateway & Discovery Beacon</div>
@@ -292,10 +315,10 @@
   </header>
 
   <main>
-    <!-- Standby Setup Card (shown when unconfigured) -->
-    <section id="standby-card" class="card standby-hero" style="display: none;">
-      <h2>🚀 First-Run Setup Required</h2>
-      <p>Meshbeacon is running in standby mode. Provide your upstream media server address (e.g. Tailscale IP or LAN hostname) and choose which services to bridge into your local LAN.</p>
+    <!-- Setup / Configuration Card -->
+    <section id="config-card" class="card standby-hero" style="display: none;">
+      <h2 id="config-heading">🚀 Media Server Setup</h2>
+      <p id="config-subtext">Provide your upstream media server address (Tailscale or LAN IP) and choose which services to bridge into your local LAN.</p>
 
       <form id="setup-form" onsubmit="handleQuickSetup(event)">
         <div class="form-group">
@@ -331,7 +354,10 @@
           </label>
         </div>
 
-        <button type="submit" class="btn">Save & Start Gateway</button>
+        <div style="display: flex; gap: 0.75rem;">
+          <button type="submit" class="btn">Save & Apply Configuration</button>
+          <button type="button" id="btn-cancel-config" class="btn btn-secondary" style="display: none;" onclick="toggleConfigForm(false)">Cancel</button>
+        </div>
       </form>
     </section>
 
@@ -341,7 +367,10 @@
       <section class="card">
         <div class="card-title">
           <span>Active Services</span>
-          <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;" onclick="location.reload()">Refresh</button>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" onclick="toggleConfigForm()">Configure Upstreams</button>
+            <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" onclick="location.reload()">Refresh</button>
+          </div>
         </div>
         <table class="services-table">
           <thead>
@@ -361,14 +390,17 @@
       <!-- System & Cache Stats -->
       <section style="display: flex; flex-direction: column; gap: 1.5rem;">
         <div class="card">
-          <div class="card-title">Dual-Tier Asset Cache</div>
+          <div class="card-title">
+            <span>Dual-Tier Asset Cache</span>
+            <button class="btn btn-danger" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="purgeCache()">Purge</button>
+          </div>
           <div class="stat-row">
             <span class="stat-label">Cache State</span>
             <span class="stat-val" id="cache-state">Active</span>
           </div>
           <div class="stat-row">
-            <span class="stat-label">RAM Cache</span>
-            <span class="stat-val" id="cache-ram">Auto</span>
+            <span class="stat-label">RAM Usage</span>
+            <span class="stat-val" id="cache-ram-used">-</span>
           </div>
           <div class="stat-row">
             <span class="stat-label">Cache Hits</span>
@@ -408,6 +440,31 @@
   </footer>
 
   <script>
+    let isStandbyMode = false;
+
+    function toggleConfigForm(forceShow) {
+      const card = document.getElementById('config-card');
+      const cancelBtn = document.getElementById('btn-cancel-config');
+      if (typeof forceShow === 'boolean') {
+        card.style.display = forceShow ? 'block' : 'none';
+      } else {
+        card.style.display = card.style.display === 'none' ? 'block' : 'none';
+      }
+      cancelBtn.style.display = isStandbyMode ? 'none' : 'inline-flex';
+    }
+
+    async function purgeCache() {
+      if (!confirm('Clear all in-memory and persistent disk cached artwork?')) return;
+      try {
+        const res = await fetch('/api/cache/clear', { method: 'POST' });
+        const data = await res.json();
+        alert(data.message || 'Cache cleared');
+        loadStatus();
+      } catch (err) {
+        alert('Failed to clear cache: ' + err);
+      }
+    }
+
     async function loadStatus() {
       try {
         const res = await fetch('/api/status');
@@ -420,16 +477,25 @@
         document.getElementById('sys-uptime').textContent = data.uptime || '-';
 
         const modeBadge = document.getElementById('mode-badge');
-        const standbyCard = document.getElementById('standby-card');
+        const configCard = document.getElementById('config-card');
+        const configHeading = document.getElementById('config-heading');
+        const configSubtext = document.getElementById('config-subtext');
 
-        if (data.mode === 'standby' || !data.configured) {
+        isStandbyMode = (data.mode === 'standby' || !data.configured);
+
+        if (isStandbyMode) {
           modeBadge.textContent = 'Standby Mode';
           modeBadge.className = 'badge badge-standby';
-          standbyCard.style.display = 'block';
+          configCard.style.display = 'block';
+          configHeading.textContent = '🚀 First-Run Setup Required';
+          configSubtext.textContent = 'Meshbeacon is running in standby mode. Provide your upstream media server address and choose which services to bridge into your local LAN.';
         } else {
           modeBadge.textContent = 'Active (Discoverable)';
           modeBadge.className = 'badge badge-active';
-          standbyCard.style.display = 'none';
+          if (configCard.style.display !== 'block') {
+            configHeading.textContent = '⚙️ Configure Upstreams & Services';
+            configSubtext.textContent = 'Modify upstream server addresses or enable/disable services below.';
+          }
         }
 
         // Render Services Table
@@ -453,7 +519,7 @@
 
         // Cache Stats
         if (data.cache) {
-          document.getElementById('cache-ram').textContent = data.cache.ram_size || 'Auto';
+          document.getElementById('cache-ram-used').textContent = data.cache.ram_used || data.cache.ram_size || 'Auto';
           document.getElementById('cache-hits').textContent = (data.cache.hits || 0).toLocaleString();
           document.getElementById('cache-misses').textContent = (data.cache.misses || 0).toLocaleString();
         }
@@ -468,7 +534,6 @@
       if (!hostInput) return;
 
       const prefix = (hostInput.startsWith('http://') || hostInput.startsWith('https://')) ? hostInput : 'http://' + hostInput;
-      // Strip trailing port if provided by user
       const cleanHost = prefix.replace(/:[0-9]+$/, '');
 
       const services = [];
@@ -541,6 +606,7 @@
           return;
         }
         alert('Configuration saved! Meshbeacon is now live.');
+        toggleConfigForm(false);
         loadStatus();
       } catch (err) {
         alert('Network error saving configuration: ' + err);

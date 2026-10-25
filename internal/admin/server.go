@@ -50,6 +50,7 @@ func NewServer(cfg *config.Config, configPath, version string, c *cache.DualTier
 	mux.HandleFunc("/healthz", s.handleHealthz)
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/config", s.handleConfig)
+	mux.HandleFunc("/api/cache/clear", s.handleCacheClear)
 	mux.HandleFunc("/api/update", s.handleUpdate)
 
 	port := cfg.AdminPort
@@ -274,4 +275,19 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) handleCacheClear(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	if s.cache != nil {
+		s.cache.Clear()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Asset cache cleared",
+	})
 }

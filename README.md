@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/social-card.jpg" alt="Meshbeacon — LAN Media Gateway & Discovery Beacon" width="100%">
+</p>
+
 # Meshbeacon
 
 > **Smart TV discovery beacon (UDP/mDNS), stream gateway, and local asset cache for Jellyfin, Plex, Immich, Audiobookshelf & self-hosted homelab services across Tailscale and WireGuard meshes.**  
