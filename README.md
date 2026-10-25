@@ -1,7 +1,7 @@
 # Meshbeacon
 
-> **Broadcast remote media servers across Tailscale, WireGuard, ZeroTier & Mesh networks into your local LAN with native Smart TV auto-discovery.**  
-> *Stream Jellyfin and Plex to Smart TVs and family devices with zero VPN client apps.*
+> **Smart TV discovery beacon (UDP/mDNS), stream gateway, and local artwork cache for Jellyfin, Plex & Tailscale/WireGuard meshes.**  
+> *Stream media to Smart TVs and family devices with native auto-discovery and zero client VPNs.*
 
 [![CI](https://github.com/shimco/meshbeacon/actions/workflows/ci.yml/badge.svg)](https://github.com/shimco/meshbeacon/actions/workflows/ci.yml)
 [![Docker](https://github.com/shimco/meshbeacon/actions/workflows/docker.yml/badge.svg)](https://github.com/shimco/meshbeacon/actions/workflows/docker.yml)
