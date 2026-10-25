@@ -382,6 +382,10 @@
             <input type="checkbox" id="svc-kavita">
             <span class="service-choice-label">Kavita (:5000, Books)</span>
           </label>
+          <label class="service-choice">
+            <input type="checkbox" id="svc-samba">
+            <span class="service-choice-label">Samba / NAS (:445, Finder)</span>
+          </label>
         </div>
 
         <!-- Advanced Hardware & Cache Controls -->
@@ -763,6 +767,14 @@
           local_port: 5000,
           upstream_url: cleanHost + ":5000",
           discovery: { type: "kavita", server_name: "Kavita Books" }
+        });
+      }
+      if (document.getElementById('svc-samba').checked) {
+        services.push({
+          name: "samba",
+          local_port: 445,
+          upstream_url: "tcp://" + cleanHost.replace(/^https?:\/\//, '') + ":445",
+          discovery: { type: "samba", server_name: "Media Server" }
         });
       }
 

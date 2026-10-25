@@ -144,8 +144,9 @@ func (c *Config) Validate() error {
 
 		if strings.TrimSpace(s.UpstreamURL) != "" {
 			trimmed := strings.TrimSpace(s.UpstreamURL)
-			if !strings.HasPrefix(trimmed, "http://") && !strings.HasPrefix(trimmed, "https://") {
-				return fmt.Errorf("services[%d] (%s): upstream_url %q must begin with http:// or https://", i, s.Name, s.UpstreamURL)
+			if !strings.HasPrefix(trimmed, "http://") && !strings.HasPrefix(trimmed, "https://") &&
+				!strings.HasPrefix(trimmed, "tcp://") && !strings.HasPrefix(trimmed, "smb://") {
+				return fmt.Errorf("services[%d] (%s): upstream_url %q must begin with http://, https://, tcp://, or smb://", i, s.Name, s.UpstreamURL)
 			}
 		}
 	}

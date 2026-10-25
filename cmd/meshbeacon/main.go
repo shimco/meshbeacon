@@ -401,6 +401,14 @@ func main() {
 				}
 				beacons = append(beacons, discovery.NewMDNSBeacon(displayName, "_subsonic._tcp", svc.LocalPort, svc.Discovery.FormattedTXT()))
 
+			case "samba", "smb":
+				displayName := svc.Discovery.ServerName
+				if displayName == "" {
+					displayName = "Media Server"
+				}
+				beacons = append(beacons, discovery.NewMDNSBeacon(displayName, "_smb._tcp", svc.LocalPort, []string{"path=/"}))
+				beacons = append(beacons, discovery.NewMDNSBeacon(displayName, "_device-info._tcp", svc.LocalPort, []string{"model=RackServer"}))
+
 			case "mdns", "generic":
 				displayName := svc.Discovery.ServerName
 				if displayName == "" {

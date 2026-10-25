@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,26 +13,67 @@ import (
 	"github.com/shimco/meshbeacon/internal/config"
 )
 
+type httpEntry struct {
+	server *http.Server
+	name   string
+	port   int
+}
+
 // Gateway manages a collection of concurrent reverse proxies across multiple ports.
 type Gateway struct {
-	services  []config.ServiceConfig
-	servers   []*http.Server
-	proxies   []*StreamProxy
-	cache     *cache.DualTierCache
-	telemetry *Telemetry
+	services   []config.ServiceConfig
+	httpSvcs   []httpEntry
+	proxies    []*StreamProxy
+	tcpProxies []*TCPProxy
+	cache      *cache.DualTierCache
+	telemetry  *Telemetry
+}
+
+// isTCPService checks if a service requires raw TCP stream proxying instead of HTTP reverse proxying.
+func isTCPService(svc config.ServiceConfig) bool {
+	u := strings.ToLower(svc.UpstreamURL)
+	if strings.HasPrefix(u, "tcp://") || strings.HasPrefix(u, "smb://") {
+		return true
+	}
+	t := strings.ToLower(svc.Discovery.Type)
+	if t == "samba" || t == "smb" || svc.LocalPort == 445 {
+		return true
+	}
+	return false
+}
+
+// parseTCPTarget extracts host:port from upstream URL for raw TCP dial.
+func parseTCPTarget(raw string, defaultPort int) string {
+	raw = strings.TrimPrefix(raw, "tcp://")
+	raw = strings.TrimPrefix(raw, "smb://")
+	raw = strings.TrimPrefix(raw, "http://")
+	raw = strings.TrimPrefix(raw, "https://")
+	raw = strings.TrimRight(raw, "/")
+	if !strings.Contains(raw, ":") {
+		return fmt.Sprintf("%s:%d", raw, defaultPort)
+	}
+	return raw
 }
 
 // NewGateway creates a gateway from service configs.
 func NewGateway(services []config.ServiceConfig, assetCache *cache.DualTierCache, tel *Telemetry) (*Gateway, error) {
 	gw := &Gateway{
-		services:  services,
-		servers:   make([]*http.Server, 0, len(services)),
-		proxies:   make([]*StreamProxy, 0, len(services)),
-		cache:     assetCache,
-		telemetry: tel,
+		services:   services,
+		httpSvcs:   make([]httpEntry, 0, len(services)),
+		proxies:    make([]*StreamProxy, 0, len(services)),
+		tcpProxies: make([]*TCPProxy, 0),
+		cache:      assetCache,
+		telemetry:  tel,
 	}
 
 	for _, svc := range services {
+		if isTCPService(svc) {
+			target := parseTCPTarget(svc.UpstreamURL, 445)
+			tp := NewTCPProxy(svc.Name, svc.LocalPort, target)
+			gw.tcpProxies = append(gw.tcpProxies, tp)
+			continue
+		}
+
 		rp, err := NewStreamProxy(svc.Name, svc.UpstreamURL, assetCache, tel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize proxy for %s (%s): %w", svc.Name, svc.UpstreamURL, err)
@@ -43,7 +85,11 @@ func NewGateway(services []config.ServiceConfig, assetCache *cache.DualTierCache
 			ReadHeaderTimeout: 10 * time.Second,
 			IdleTimeout:       120 * time.Second,
 		}
-		gw.servers = append(gw.servers, server)
+		gw.httpSvcs = append(gw.httpSvcs, httpEntry{
+			server: server,
+			name:   svc.Name,
+			port:   svc.LocalPort,
+		})
 		gw.proxies = append(gw.proxies, rp)
 	}
 
@@ -58,17 +104,27 @@ func (gw *Gateway) Start(ctx context.Context) error {
 
 	var wg sync.WaitGroup
 
-	for i, server := range gw.servers {
-		svc := gw.services[i]
+	// Start raw TCP stream proxies (e.g. Samba 445)
+	for _, tp := range gw.tcpProxies {
 		wg.Add(1)
-
-		go func(s *http.Server, name string, port int) {
+		go func(p *TCPProxy) {
 			defer wg.Done()
-			log.Printf("[Gateway] %s proxy listening on :%d", name, port)
-			if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("[Gateway Error] %s server failed: %v", name, err)
+			if err := p.Start(ctx); err != nil {
+				log.Printf("[TCP Gateway Error] %v", err)
 			}
-		}(server, svc.Name, svc.LocalPort)
+		}(tp)
+	}
+
+	// Start HTTP streaming reverse proxies
+	for _, entry := range gw.httpSvcs {
+		wg.Add(1)
+		go func(e httpEntry) {
+			defer wg.Done()
+			log.Printf("[Gateway] %s proxy listening on :%d", e.name, e.port)
+			if err := e.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("[Gateway Error] %s server failed: %v", e.name, err)
+			}
+		}(entry)
 	}
 
 	// Wait for context cancellation to initiate shutdown
@@ -78,8 +134,8 @@ func (gw *Gateway) Start(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	for _, server := range gw.servers {
-		_ = server.Shutdown(shutdownCtx)
+	for _, entry := range gw.httpSvcs {
+		_ = entry.server.Shutdown(shutdownCtx)
 	}
 
 	wg.Wait()
