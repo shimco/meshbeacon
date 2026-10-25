@@ -67,6 +67,10 @@ func NewGateway(services []config.ServiceConfig, assetCache *cache.DualTierCache
 	}
 
 	for _, svc := range services {
+		if svc.Discovery.Direct && svc.LocalPort == 0 {
+			// Discovery-only mode: do not spin up proxy listener
+			continue
+		}
 		if isTCPService(svc) {
 			target := parseTCPTarget(svc.UpstreamURL, 445)
 			tp := NewTCPProxy(svc.Name, svc.LocalPort, target)

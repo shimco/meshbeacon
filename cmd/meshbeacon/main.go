@@ -7,9 +7,12 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -406,8 +409,12 @@ func main() {
 				if displayName == "" {
 					displayName = "Media Server"
 				}
+				model := "Xserve"
+				if m, ok := svc.Discovery.TXT["model"]; ok && m != "" {
+					model = m
+				}
 				beacons = append(beacons, discovery.NewMDNSBeacon(displayName, "_smb._tcp", svc.LocalPort, []string{"path=/"}))
-				beacons = append(beacons, discovery.NewMDNSBeacon(displayName, "_device-info._tcp", svc.LocalPort, []string{"model=RackServer"}))
+				beacons = append(beacons, discovery.NewMDNSBeacon(displayName, "_device-info._tcp", 0, []string{"model=" + model}))
 
 			case "mdns", "generic":
 				displayName := svc.Discovery.ServerName
@@ -415,6 +422,15 @@ func main() {
 					displayName = svc.Name
 				}
 				beacons = append(beacons, discovery.NewMDNSBeacon(displayName, svc.Discovery.NormalizeServiceType(svc.Name), svc.LocalPort, svc.Discovery.FormattedTXT()))
+			}
+
+			if svc.Discovery.Direct {
+				targetHost, targetPort, targetIPs := parseDirectTarget(svc.UpstreamURL, svc.LocalPort)
+				for _, b := range beacons {
+					if mdns, ok := b.(*discovery.MDNSBeacon); ok {
+						mdns.SetTarget(targetHost, targetPort, targetIPs)
+					}
+				}
 			}
 
 			for _, b := range beacons {
@@ -515,3 +531,42 @@ func main() {
 	wg.Wait()
 	log.Println("👋 Meshbeacon shutdown complete.")
 }
+
+// parseDirectTarget extracts host, port, and IP addresses from an upstream URL
+// for direct mDNS advertising without passing through a local proxy gateway.
+func parseDirectTarget(rawURL string, defaultPort int) (string, int, []net.IP) {
+	raw := rawURL
+	for _, p := range []string{"tcp://", "smb://", "http://", "https://"} {
+		raw = strings.TrimPrefix(raw, p)
+	}
+	raw = strings.TrimRight(raw, "/")
+	host := raw
+	port := defaultPort
+
+	if strings.Contains(raw, ":") {
+		h, pStr, err := net.SplitHostPort(raw)
+		if err == nil {
+			host = h
+			if p, err := strconv.Atoi(pStr); err == nil && p > 0 {
+				port = p
+			}
+		}
+	}
+
+	var ips []net.IP
+	if parsed := net.ParseIP(host); parsed != nil {
+		if ip4 := parsed.To4(); ip4 != nil {
+			ips = append(ips, ip4)
+		}
+	} else {
+		if resolved, err := net.LookupIP(host); err == nil {
+			for _, r := range resolved {
+				if ip4 := r.To4(); ip4 != nil {
+					ips = append(ips, ip4)
+				}
+			}
+		}
+	}
+	return host, port, ips
+}
+

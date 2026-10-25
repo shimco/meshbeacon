@@ -17,6 +17,7 @@ type DiscoveryConfig struct {
 	ServerID   string            `json:"server_id"`   // Unique server identifier (auto-detected for Jellyfin/Plex)
 	Service    string            `json:"service"`     // mDNS service type, e.g. "_immich._tcp", "_ipp._tcp", "_hap._tcp"
 	TXT        map[string]string `json:"txt"`         // Custom mDNS TXT record key-value pairs
+	Direct     bool              `json:"direct"`      // If true, advertise upstream host/IP directly (discovery-only / direct mode)
 }
 
 // NormalizeServiceType formats the service identifier into RFC 6763 DNS-SD format (e.g. "_immich._tcp").
@@ -134,13 +135,16 @@ func (c *Config) Validate() error {
 		if strings.TrimSpace(s.Name) == "" {
 			return fmt.Errorf("services[%d]: service name cannot be empty", i)
 		}
-		if s.LocalPort < 1 || s.LocalPort > 65535 {
+		if s.Discovery.Direct && s.LocalPort == 0 {
+			// Discovery-only / direct mode: no local gateway port required
+		} else if s.LocalPort < 1 || s.LocalPort > 65535 {
 			return fmt.Errorf("services[%d] (%s): invalid local_port %d", i, s.Name, s.LocalPort)
+		} else {
+			if owner, exists := usedPorts[s.LocalPort]; exists {
+				return fmt.Errorf("services[%d] (%s): local_port %d conflicts with %s", i, s.Name, s.LocalPort, owner)
+			}
+			usedPorts[s.LocalPort] = s.Name
 		}
-		if owner, exists := usedPorts[s.LocalPort]; exists {
-			return fmt.Errorf("services[%d] (%s): local_port %d conflicts with %s", i, s.Name, s.LocalPort, owner)
-		}
-		usedPorts[s.LocalPort] = s.Name
 
 		if strings.TrimSpace(s.UpstreamURL) != "" {
 			trimmed := strings.TrimSpace(s.UpstreamURL)

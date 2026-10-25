@@ -17,12 +17,13 @@ import (
 // MDNSBeacon implements a native, zero-dependency Multicast DNS (mDNS / Bonjour / DNS-SD)
 // responder and broadcaster conforming to RFC 6762 and RFC 6763.
 // It announces media services on 224.0.0.251:5353 so Smart TVs (Apple TV, Android TV,
-// Fire TV, Roku, Swiftfin, Infuse) autodiscover services without requiring third-party libraries.
 type MDNSBeacon struct {
 	instanceName string
 	serviceType  string // e.g. "_jellyfin._tcp" or "_plexmediasvr._tcp"
 	port         int
 	txtRecords   []string
+	targetHost   string
+	targetIPs   []net.IP
 }
 
 // NewMDNSBeacon creates an mDNS responder for a specific service type.
@@ -33,6 +34,17 @@ func NewMDNSBeacon(instanceName, serviceType string, port int, txtRecords []stri
 		port:         port,
 		txtRecords:   txtRecords,
 	}
+}
+
+// SetTarget configures the beacon to point SRV and A records directly to an explicit target
+// host and IP address (e.g. for direct Tailscale discovery) instead of the local gateway.
+func (b *MDNSBeacon) SetTarget(host string, port int, ips []net.IP) *MDNSBeacon {
+	b.targetHost = host
+	if port > 0 {
+		b.port = port
+	}
+	b.targetIPs = ips
+	return b
 }
 
 // Name returns the protocol identifier.
@@ -54,13 +66,19 @@ func (b *MDNSBeacon) Start(ctx context.Context) error {
 	}
 
 	// Determine host identity and IP addresses
-	hostName := getSanitizedHostname()
-	ips := getLocalIPv4s()
+	hostName := b.targetHost
+	if hostName == "" {
+		hostName = getSanitizedHostname()
+	}
+	ips := b.targetIPs
 	if len(ips) == 0 {
-		outIP, err := netutil.GetOutboundIP()
-		if err == nil {
-			if parsed := net.ParseIP(outIP); parsed != nil {
-				ips = append(ips, parsed)
+		ips = getLocalIPv4s()
+		if len(ips) == 0 {
+			outIP, err := netutil.GetOutboundIP()
+			if err == nil {
+				if parsed := net.ParseIP(outIP); parsed != nil {
+					ips = append(ips, parsed)
+				}
 			}
 		}
 	}
@@ -205,7 +223,15 @@ func (b *MDNSBeacon) buildDNSResponse(hostName string, ips []net.IP, isGoodbye b
 	srvLabels = append(srvLabels, "local")
 
 	instLabels := append([]string{b.instanceName}, srvLabels...)
-	hostLabels := []string{hostName, "local"}
+	var hostLabels []string
+	if strings.HasSuffix(strings.ToLower(hostName), ".local") {
+		trimmed := strings.TrimSuffix(strings.ToLower(hostName), ".local")
+		hostLabels = append(strings.Split(trimmed, "."), "local")
+	} else if strings.Contains(hostName, ".") {
+		hostLabels = strings.Split(hostName, ".")
+	} else {
+		hostLabels = []string{hostName, "local"}
+	}
 	enumLabels := []string{"_services", "_dns-sd", "_udp", "local"}
 
 	srvDomain := encodeDomain(srvLabels...)
