@@ -1,7 +1,7 @@
 # Meshbeacon
 
-> **Smart TV discovery beacon (UDP/mDNS), stream gateway, and local artwork cache for Jellyfin, Plex & Tailscale/WireGuard meshes.**  
-> *Stream media to Smart TVs and family devices with native auto-discovery and zero client VPNs.*
+> **Smart TV discovery beacon (UDP/mDNS), stream gateway, and local asset cache for Jellyfin, Plex, Immich, Audiobookshelf & self-hosted homelab services across Tailscale and WireGuard meshes.**  
+> *Stream media, browse photo timelines, and proxy homelab services to local devices with native auto-discovery and zero client VPNs.*
 
 [![CI](https://github.com/shimco/meshbeacon/actions/workflows/ci.yml/badge.svg)](https://github.com/shimco/meshbeacon/actions/workflows/ci.yml)
 [![Docker](https://github.com/shimco/meshbeacon/actions/workflows/docker.yml/badge.svg)](https://github.com/shimco/meshbeacon/actions/workflows/docker.yml)
@@ -25,9 +25,10 @@ Running VPN clients directly on Smart TVs (Google TV, Android TV, Apple TV, Fire
 
 Meshbeacon bridges your remote server into your local home Wi-Fi:
 * **Native Local Auto-Discovery:** Emulates local server discovery probes (UDP `7359` for Jellyfin, GDM UDP `32414` for Plex, and mDNS/DNS-SD `_jellyfin._tcp`) so TV apps find the server automatically.
+* **Modular Multi-Service Engine:** Natively bridges and caches **Jellyfin** (UDP 7359 / mDNS), **Plex** (GDM UDP 32414), **Immich** (photos & thumbnail timeline cache), **Audiobookshelf** (audio streaming & book covers), **Navidrome** (music & album art), **Kavita** (manga/e-books), and generic HTTP/mDNS services.
 * **Zero Client Installs:** TVs, streaming sticks, and family devices connect directly over standard local Wi-Fi without VPN software.
 * **Zero-Allocation 4K Streaming:** Hardened reverse proxy using pooled 32KB buffers (`sync.Pool`) delivers high-throughput video streaming with near-zero CPU and <10MB of RAM.
-* **Dual-Tier Asset Caching:** Stores posters and photo thumbnails in RAM or local NVMe with zero SD-card wear, making browsing fast over high-latency WAN links.
+* **Dual-Tier Asset Caching:** Stores posters, photo thumbnails, and album artwork in RAM or local NVMe with zero SD-card wear, making browsing fast over high-latency WAN links.
 
 ---
 
@@ -66,6 +67,20 @@ Meshbeacon bridges your remote server into your local home Wi-Fi:
 
 ---
 
+## Supported Services & Discovery Profiles
+
+| Service | Discovery Protocol | What Meshbeacon Does |
+| :--- | :--- | :--- |
+| **Jellyfin** | UDP `7359` broadcast & mDNS (`_jellyfin._tcp`) | Emulates server beacon for Smart TVs; proxies 4K streams; caches movie posters |
+| **Plex** | GDM UDP `32414` & mDNS (`_plexmediasvr._tcp`) | Answers GDM discovery probes; forces Direct Play; bypasses 2 Mbps cloud relays |
+| **Immich** | mDNS (`_immich._tcp` / `_http._tcp`) | Local photo backup discovery; caches timeline thumbnails and asset grids |
+| **Audiobookshelf** | mDNS (`_audiobookshelf._tcp`) | Auto-discovery for mobile apps; streams audiobooks; caches book cover art |
+| **Navidrome** | mDNS (`_subsonic._tcp`) | Subsonic client discovery; streams music; caches album covers |
+| **Kavita / Mealie** | mDNS (`_http._tcp`) | Local discovery for reading & recipe apps; caches covers and recipe images |
+| **Generic HTTP** | Custom mDNS DNS-SD record | Reverse-proxy any homelab dashboard, printer (IPP), or companion app (Jellyseerr/Overseerr) |
+
+---
+
 ## Quick Start
 
 ### Docker Compose (Recommended)
@@ -86,6 +101,12 @@ Meshbeacon bridges your remote server into your local home Wi-Fi:
          "local_port": 32400,
          "upstream_url": "http://media-server.your-tailnet.ts.net:32400",
          "discovery": { "type": "plex", "port": 32414 }
+       },
+       {
+         "name": "immich",
+         "local_port": 2283,
+         "upstream_url": "http://photos.your-tailnet.ts.net:2283",
+         "discovery": { "type": "immich" }
        }
      ]
    }
