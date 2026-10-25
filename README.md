@@ -219,10 +219,10 @@ Meshbeacon is 100% private, open source, and offline-first:
 Here are the features and packaging initiatives planned for future releases:
 
 * [ ] **Official OpenWrt Package Feed:** Submit an upstream `Makefile` package to `openwrt/packages` for native installation via `opkg install meshbeacon`.
-* [ ] **GL.iNet Admin Panel Integration:** Package as a native application tile/card for GL.iNet travel routers (Beryl AX, Slate AX, Flint 2).
-* [ ] **Embedded Tailscale (`tsnet`) Mode:** Optional zero-config mode allowing Meshbeacon to join your tailnet directly as an ephemeral node without requiring host-level Tailscale installed.
-* [ ] **Local HTTPS / TLS Termination:** Automated local certificates and Tailscale HTTPS (`*.ts.net`) support for secure Smart TV client connections and WebSocket streaming.
-* [ ] **E-Reader & OPDS Discovery Profile:** First-class discovery and cover-art caching presets for Calibre-Web, Kavita, and KOReader on e-ink devices.
+* [ ] **GL.iNet Admin Panel Integration:** Package as an installable application tile/card for GL.iNet travel routers (Beryl AX, Slate AX, Flint 2).
+* [ ] **Samba / NAS Finder Auto-Discovery:** First-class `_smb._tcp` and `_device-info._tcp` mDNS profiles so remote home NAS and Samba shares automatically populate in macOS Finder sidebars and Windows Network Explorer.
+* [ ] **Raw TCP Forwarding:** Support raw byte-stream forwarding for non-HTTP services (SMB `:445`, SSH `:22`, CUPS `:631`) alongside standard HTTP reverse proxying.
+* [ ] **E-Reader & OPDS Discovery Profile:** Discovery and cover-art caching presets for Calibre-Web, Kavita, and KOReader on e-ink devices.
 * [ ] **Community Client Device Matrix:** Publish verified client test results for Apple TV (Swiftfin / Infuse), Roku, LG webOS, Samsung Tizen, and e-readers.
 
 ---
