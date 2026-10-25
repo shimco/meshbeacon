@@ -214,6 +214,19 @@ Meshbeacon is 100% private, open source, and offline-first:
 
 ---
 
+## 🗺️ Roadmap & Upcoming Milestones
+
+Here are the features and packaging initiatives planned for future releases:
+
+* [ ] **Official OpenWrt Package Feed:** Submit an upstream `Makefile` package to `openwrt/packages` for native installation via `opkg install meshbeacon`.
+* [ ] **GL.iNet Admin Panel Integration:** Package as a native application tile/card for GL.iNet travel routers (Beryl AX, Slate AX, Flint 2).
+* [ ] **Embedded Tailscale (`tsnet`) Mode:** Optional zero-config mode allowing Meshbeacon to join your tailnet directly as an ephemeral node without requiring host-level Tailscale installed.
+* [ ] **Local HTTPS / TLS Termination:** Automated local certificates and Tailscale HTTPS (`*.ts.net`) support for secure Smart TV client connections and WebSocket streaming.
+* [ ] **E-Reader & OPDS Discovery Profile:** First-class discovery and cover-art caching presets for Calibre-Web, Kavita, and KOReader on e-ink devices.
+* [ ] **Community Client Device Matrix:** Publish verified client test results for Apple TV (Swiftfin / Infuse), Roku, LG webOS, Samsung Tizen, and e-readers.
+
+---
+
 ## Feedback & Issues
 
 Found a bug, have a feature idea, or running this on a travel router? [Open a GitHub Issue or Discussion](https://github.com/shimco/meshbeacon/issues). Real-world feedback and test notes are very welcome!
