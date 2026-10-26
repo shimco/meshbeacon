@@ -424,10 +424,15 @@ func main() {
 				beacons = append(beacons, discovery.NewMDNSBeacon(displayName, svc.Discovery.NormalizeServiceType(svc.Name), svc.LocalPort, svc.Discovery.FormattedTXT()))
 			}
 
-			if svc.Discovery.Direct {
-				targetHost, targetPort, targetIPs := parseDirectTarget(svc.UpstreamURL, svc.LocalPort)
-				for _, b := range beacons {
-					if mdns, ok := b.(*discovery.MDNSBeacon); ok {
+			policy := svc.Discovery.CollisionPolicy
+			if policy == "" {
+				policy = currentCfg.CollisionPolicy
+			}
+			for _, b := range beacons {
+				if mdns, ok := b.(*discovery.MDNSBeacon); ok {
+					mdns.SetCollisionPolicy(policy)
+					if svc.Discovery.Direct {
+						targetHost, targetPort, targetIPs := parseDirectTarget(svc.UpstreamURL, svc.LocalPort)
 						mdns.SetTarget(targetHost, targetPort, targetIPs)
 					}
 				}

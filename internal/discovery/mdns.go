@@ -18,22 +18,32 @@ import (
 // responder and broadcaster conforming to RFC 6762 and RFC 6763.
 // It announces media services on 224.0.0.251:5353 so Smart TVs (Apple TV, Android TV,
 type MDNSBeacon struct {
-	instanceName string
-	serviceType  string // e.g. "_jellyfin._tcp" or "_plexmediasvr._tcp"
-	port         int
-	txtRecords   []string
-	targetHost   string
-	targetIPs   []net.IP
+	instanceName    string
+	serviceType     string // e.g. "_jellyfin._tcp" or "_plexmediasvr._tcp"
+	port            int
+	txtRecords      []string
+	targetHost      string
+	targetIPs      []net.IP
+	collisionPolicy string // "auto_rename" (default), "suppress", "none"
 }
 
 // NewMDNSBeacon creates an mDNS responder for a specific service type.
 func NewMDNSBeacon(instanceName, serviceType string, port int, txtRecords []string) *MDNSBeacon {
 	return &MDNSBeacon{
-		instanceName: instanceName,
-		serviceType:  serviceType,
-		port:         port,
-		txtRecords:   txtRecords,
+		instanceName:    instanceName,
+		serviceType:     serviceType,
+		port:            port,
+		txtRecords:      txtRecords,
+		collisionPolicy: "auto_rename",
 	}
+}
+
+// SetCollisionPolicy sets the conflict resolution policy ("auto_rename", "suppress", "none").
+func (b *MDNSBeacon) SetCollisionPolicy(policy string) *MDNSBeacon {
+	if policy != "" {
+		b.collisionPolicy = policy
+	}
+	return b
 }
 
 // SetTarget configures the beacon to point SRV and A records directly to an explicit target
@@ -83,16 +93,54 @@ func (b *MDNSBeacon) Start(ctx context.Context) error {
 		}
 	}
 
-	// Pre-generate standard announcement and goodbye packets
-	announcementPacket := b.buildDNSResponse(hostName, ips, false)
-	goodbyePacket := b.buildDNSResponse(hostName, ips, true)
-
 	// Create dedicated outbound UDP connection for sending multicasts
 	outConn, err := net.DialUDP("udp4", nil, mcastAddr)
 	if err != nil {
 		return fmt.Errorf("failed to open outbound mDNS socket: %w", err)
 	}
 	defer outConn.Close()
+
+	// Listen for incoming queries if possible (using SO_REUSEPORT)
+	queryConn, err := net.ListenMulticastUDP("udp4", nil, mcastAddr)
+	if err == nil {
+		defer queryConn.Close()
+		log.Printf("[mDNS Beacon] Active & query-listening on 224.0.0.251:5353 for %s (%s)", b.instanceName, b.serviceType)
+	} else {
+		log.Printf("[mDNS Beacon] Note: Port 5353 bound by another service (%v); running active announcement broadcasts", err)
+	}
+
+	// 1. Conflict Probing (Mode A auto-disambiguation / Mode B suppression)
+	policy := b.collisionPolicy
+	if policy == "" || policy == "auto" {
+		policy = "auto_rename"
+	}
+	if policy != "none" && queryConn != nil {
+		if b.probeForConflict(ctx, queryConn, outConn) {
+			if policy == "suppress" {
+				log.Printf("[mDNS Beacon] Conflict detected: %q (%s) already active on LAN; suppressing beacon to prevent split-brain", b.instanceName, b.serviceType)
+				<-ctx.Done()
+				return nil
+			}
+			if policy == "auto_rename" {
+				oldName := b.instanceName
+				sanitized := getSanitizedHostname()
+				if !strings.Contains(b.instanceName, sanitized) {
+					b.instanceName = fmt.Sprintf("%s (%s)", b.instanceName, sanitized)
+				} else {
+					b.instanceName = fmt.Sprintf("%s-2", b.instanceName)
+				}
+				log.Printf("[mDNS Beacon] Conflict detected on LAN for %q; auto-renamed to %q (Mode A)", oldName, b.instanceName)
+			}
+		}
+	}
+
+	// Pre-generate standard announcement and goodbye packets
+	announcementPacket := b.buildDNSResponse(hostName, ips, false)
+	goodbyePacket := b.buildDNSResponse(hostName, ips, true)
+
+	if queryConn != nil {
+		go b.listenForQueries(ctx, queryConn, outConn, announcementPacket)
+	}
 
 	sendAnnouncement := func() {
 		if _, err := outConn.Write(announcementPacket); err != nil {
@@ -101,17 +149,7 @@ func (b *MDNSBeacon) Start(ctx context.Context) error {
 		}
 	}
 
-	// Listen for incoming queries if possible (using SO_REUSEPORT)
-	queryConn, err := net.ListenMulticastUDP("udp4", nil, mcastAddr)
-	if err == nil {
-		defer queryConn.Close()
-		go b.listenForQueries(ctx, queryConn, outConn, announcementPacket)
-		log.Printf("[mDNS Beacon] Active & query-listening on 224.0.0.251:5353 for %s (%s)", b.instanceName, b.serviceType)
-	} else {
-		log.Printf("[mDNS Beacon] Note: Port 5353 bound by another service (%v); running active announcement broadcasts", err)
-	}
-
-	// 1. Startup burst: 0s, 2s, 5s, 10s to ensure aggressive discovery
+	// 2. Startup burst: 0s, 2s, 5s to ensure aggressive discovery
 	sendAnnouncement()
 	for _, delay := range []time.Duration{2 * time.Second, 3 * time.Second, 5 * time.Second} {
 		select {
@@ -122,8 +160,10 @@ func (b *MDNSBeacon) Start(ctx context.Context) error {
 		}
 	}
 
-	// 2. Steady-state loop: refresh every 30 seconds
-	ticker := time.NewTicker(30 * time.Second)
+	// 3. Steady-state loop: refresh every 15 minutes instead of 30 seconds
+	// RFC 6762 / Airtime-fairness: Keep unsolicited broadcasts infrequent to protect
+	// Wi-Fi airtime and battery. The query listener above responds immediately in real time.
+	ticker := time.NewTicker(15 * time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -136,6 +176,79 @@ func (b *MDNSBeacon) Start(ctx context.Context) error {
 			sendAnnouncement()
 		}
 	}
+}
+
+// probeForConflict sends a probe query and listens for up to 250ms to see if another
+// responder on the local network is actively advertising the same instance name.
+func (b *MDNSBeacon) probeForConflict(ctx context.Context, inConn *net.UDPConn, outConn *net.UDPConn) bool {
+	typeParts := strings.Split(b.serviceType, ".")
+	var srvLabels []string
+	for _, p := range typeParts {
+		if p != "" {
+			srvLabels = append(srvLabels, p)
+		}
+	}
+	srvLabels = append(srvLabels, "local")
+	instLabels := append([]string{b.instanceName}, srvLabels...)
+	qDomain := encodeDomain(instLabels...)
+
+	var qBuf bytes.Buffer
+	binary.Write(&qBuf, binary.BigEndian, uint16(0))      // ID
+	binary.Write(&qBuf, binary.BigEndian, uint16(0x0000)) // Flags: standard query
+	binary.Write(&qBuf, binary.BigEndian, uint16(1))      // QDCOUNT
+	binary.Write(&qBuf, binary.BigEndian, uint16(0))      // ANCOUNT
+	binary.Write(&qBuf, binary.BigEndian, uint16(0))      // NSCOUNT
+	binary.Write(&qBuf, binary.BigEndian, uint16(0))      // ARCOUNT
+
+	qBuf.Write(qDomain)
+	binary.Write(&qBuf, binary.BigEndian, uint16(255)) // QTYPE ANY
+	binary.Write(&qBuf, binary.BigEndian, uint16(1))   // QCLASS IN
+
+	if _, err := outConn.Write(qBuf.Bytes()); err != nil {
+		return false
+	}
+
+	deadline := time.Now().Add(250 * time.Millisecond)
+	_ = inConn.SetReadDeadline(deadline)
+
+	buf := make([]byte, 4096)
+	targetLower := strings.ToLower(b.instanceName)
+	svcLower := strings.ToLower(b.serviceType)
+
+	for {
+		if time.Now().After(deadline) {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+		}
+
+		n, _, err := inConn.ReadFrom(buf)
+		if err != nil {
+			break
+		}
+		if n < 12 {
+			continue
+		}
+		flags := binary.BigEndian.Uint16(buf[2:4])
+		if flags&0x8000 == 0 {
+			continue // ignore incoming queries
+		}
+		anCount := binary.BigEndian.Uint16(buf[6:8])
+		if anCount == 0 {
+			continue
+		}
+
+		// Check if answer contains our instance and service type
+		packetStr := strings.ToLower(string(buf[:n]))
+		if strings.Contains(packetStr, targetLower) && strings.Contains(packetStr, svcLower) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // listenForQueries reads incoming mDNS queries and immediately replies if our service is requested.
@@ -286,7 +399,20 @@ func (b *MDNSBeacon) buildDNSResponse(hostName string, ips []net.IP, isGoodbye b
 	binary.Write(&buf, binary.BigEndian, uint16(0x8001)) // CLASS IN + Cache Flush bit
 	binary.Write(&buf, binary.BigEndian, ttl)
 	var txtData []byte
-	for _, t := range b.txtRecords {
+	rawTXT := b.txtRecords
+	if b.serviceType != "_device-info._tcp" {
+		hasDaemon := false
+		for _, t := range rawTXT {
+			if strings.HasPrefix(t, "daemon=") {
+				hasDaemon = true
+				break
+			}
+		}
+		if !hasDaemon {
+			rawTXT = append(rawTXT, "daemon=meshbeacon")
+		}
+	}
+	for _, t := range rawTXT {
 		if len(t) > 0 {
 			txtData = append(txtData, byte(len(t)))
 			txtData = append(txtData, t...)

@@ -86,3 +86,34 @@ func TestSanitizeHostname(t *testing.T) {
 		t.Errorf("hostname should not contain .local suffix")
 	}
 }
+
+func TestSetCollisionPolicy(t *testing.T) {
+	b := NewMDNSBeacon("Samba Share", "_smb._tcp", 445, []string{"path=/"})
+	if b.collisionPolicy != "auto_rename" {
+		t.Errorf("expected default collision policy 'auto_rename', got %q", b.collisionPolicy)
+	}
+
+	b.SetCollisionPolicy("suppress")
+	if b.collisionPolicy != "suppress" {
+		t.Errorf("expected collision policy 'suppress', got %q", b.collisionPolicy)
+	}
+}
+
+func TestDaemonTXTRecord(t *testing.T) {
+	b := NewMDNSBeacon("Jellyfin", "_jellyfin._tcp", 8096, []string{"path=/"})
+	ips := []net.IP{net.ParseIP("192.168.1.100")}
+	packet := b.buildDNSResponse("test-host", ips, false)
+
+	// Verify that "daemon=meshbeacon" is present in the raw DNS packet
+	if !strings.Contains(string(packet), "daemon=meshbeacon") {
+		t.Errorf("expected packet to contain 'daemon=meshbeacon' in TXT record")
+	}
+
+	// For _device-info._tcp, verify daemon=meshbeacon is NOT injected (strict Apple CoreTypes compatibility)
+	devInfo := NewMDNSBeacon("Media Server", "_device-info._tcp", 0, []string{"model=Xserve"})
+	devPacket := devInfo.buildDNSResponse("test-host", ips, false)
+	if strings.Contains(string(devPacket), "daemon=meshbeacon") {
+		t.Errorf("_device-info._tcp should not contain 'daemon=meshbeacon' to preserve macOS CoreTypes icon rendering")
+	}
+}
+

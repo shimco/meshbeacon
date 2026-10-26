@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -192,3 +193,53 @@ func TestValidateConfig(t *testing.T) {
 		t.Errorf("Expected error for non-http(s) upstream URL")
 	}
 }
+
+func TestLoadConfigEnvExpansion(t *testing.T) {
+	t.Setenv("TEST_MB_HOST", "my-nas")
+	t.Setenv("TEST_MB_PORT", "8096")
+
+	content := `{
+		"admin_port": 7350,
+		"collision_policy": "auto_rename",
+		"services": [
+			{
+				"name": "jellyfin",
+				"local_port": 8096,
+				"upstream_url": "http://${TEST_MB_HOST}:${TEST_MB_PORT}",
+				"discovery": {
+					"server_name": "Jellyfin on ${TEST_MB_HOST}"
+				}
+			}
+		]
+	}`
+
+	tmpFile, err := os.CreateTemp("", "meshbeacon-test-*.json")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatalf("Failed to write temp file: %v", err)
+	}
+	_ = tmpFile.Close()
+
+	cfg, err := LoadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg.CollisionPolicy != "auto_rename" {
+		t.Errorf("Expected collision_policy auto_rename, got: %s", cfg.CollisionPolicy)
+	}
+	if len(cfg.Services) != 1 {
+		t.Fatalf("Expected 1 service, got %d", len(cfg.Services))
+	}
+	if cfg.Services[0].UpstreamURL != "http://my-nas:8096" {
+		t.Errorf("Expected expanded upstream_url http://my-nas:8096, got: %s", cfg.Services[0].UpstreamURL)
+	}
+	if cfg.Services[0].Discovery.ServerName != "Jellyfin on my-nas" {
+		t.Errorf("Expected expanded server_name 'Jellyfin on my-nas', got: %s", cfg.Services[0].Discovery.ServerName)
+	}
+}
+

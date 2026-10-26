@@ -129,8 +129,9 @@ type StatusResponse struct {
 	Version       string                 `json:"version"`
 	Mode          string                 `json:"mode"`
 	Configured    bool                   `json:"configured"`
-	AdvertiseAddr string                 `json:"advertise_addr"`
-	Uptime        string                 `json:"uptime"`
+	AdvertiseAddr   string                 `json:"advertise_addr"`
+	CollisionPolicy string                 `json:"collision_policy,omitempty"`
+	Uptime          string                 `json:"uptime"`
 	Services      []config.ServiceConfig `json:"services"`
 	Cache         map[string]interface{} `json:"cache"`
 	AutoResolved  map[string]string      `json:"auto_resolved"`
@@ -191,14 +192,15 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := StatusResponse{
-		Version:       s.version,
-		Mode:          mode,
-		Configured:    configured,
-		AdvertiseAddr: cfg.AdvertiseAddr,
-		Uptime:        uptimeStr,
-		Services:      cfg.Services,
-		Cache:         cacheInfo,
-		AutoResolved:  autoResolved,
+		Version:         s.version,
+		Mode:            mode,
+		Configured:      configured,
+		AdvertiseAddr:   cfg.AdvertiseAddr,
+		CollisionPolicy: cfg.CollisionPolicy,
+		Uptime:          uptimeStr,
+		Services:        cfg.Services,
+		Cache:           cacheInfo,
+		AutoResolved:    autoResolved,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

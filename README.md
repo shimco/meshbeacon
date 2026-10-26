@@ -218,10 +218,12 @@ Meshbeacon is 100% private, open source, and offline-first:
 
 Here are the features and packaging initiatives planned for future releases:
 
+* [x] **Samba / NAS Finder Auto-Discovery:** First-class `_smb._tcp` and `_device-info._tcp` mDNS profiles with native macOS server icon mapping (`model=Xserve`) so remote home NAS and Samba shares automatically populate in macOS Finder sidebars and Windows Network Explorer.
+* [x] **Raw TCP Forwarding:** Support raw byte-stream forwarding for non-HTTP services (SMB `:445`, SSH `:22`, CUPS `:631`) alongside standard HTTP reverse proxying.
+* [x] **Direct Tailscale Discovery Mode:** Advertise upstream Tailscale IPs directly in mDNS SRV/A records (`direct: true`), allowing WireGuard-capable Macs and PCs to connect at full wire speed while bypassing router CPU overhead.
+* [x] **Airtime-Friendly mDNS & Mode A Collision Detection:** Replaced aggressive 30s broadcast loops with passive query listening, probe-based split-brain detection, and Mode A auto-disambiguation (`server_name (hostname)`) when multiple Meshbeacons run on the same LAN.
 * [ ] **Official OpenWrt Package Feed:** Submit an upstream `Makefile` package to `openwrt/packages` for native installation via `opkg install meshbeacon`.
 * [ ] **GL.iNet Admin Panel Integration:** Package as an installable application tile/card for GL.iNet travel routers (Beryl AX, Slate AX, Flint 2).
-* [ ] **Samba / NAS Finder Auto-Discovery:** First-class `_smb._tcp` and `_device-info._tcp` mDNS profiles so remote home NAS and Samba shares automatically populate in macOS Finder sidebars and Windows Network Explorer.
-* [ ] **Raw TCP Forwarding:** Support raw byte-stream forwarding for non-HTTP services (SMB `:445`, SSH `:22`, CUPS `:631`) alongside standard HTTP reverse proxying.
 * [ ] **E-Reader & OPDS Discovery Profile:** Discovery and cover-art caching presets for Calibre-Web, Kavita, and KOReader on e-ink devices.
 * [ ] **Community Client Device Matrix:** Publish verified client test results for Apple TV (Swiftfin / Infuse), Roku, LG webOS, Samsung Tizen, and e-readers.
 

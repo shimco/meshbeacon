@@ -447,6 +447,28 @@
               <input type="number" id="cfg-admin-port" class="input-text" placeholder="7350" min="1" max="65535">
               <div class="help-text">Port used to access this web UI (default: 7350). Changing this port requires a service restart.</div>
             </div>
+
+            <div class="form-group" style="grid-column: 1 / -1; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.85rem;">
+              <label style="display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer;">
+                <input type="checkbox" id="cfg-samba-direct" style="margin-top: 0.25rem;">
+                <div>
+                  <strong style="color: var(--text-main);">Direct Tailscale Mode for Samba (Bypass Router Proxy)</strong>
+                  <div class="help-text" style="margin-top: 0.25rem;">
+                    Advertise the remote Tailscale IP directly on local Wi-Fi for macOS Finder &amp; Windows Explorer. Enables high-speed LAN file transfers directly over native WireGuard without taxing this router's CPU. (Requires Tailscale installed on the client Mac/PC; leave unchecked for Smart TVs or devices without Tailscale).
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label for="cfg-collision-policy">Discovery Collision Policy</label>
+              <select id="cfg-collision-policy" class="select-box">
+                <option value="auto_rename" selected>Auto-Rename (Mode A — Append hostname on duplicate)</option>
+                <option value="suppress">Suppress (Mode B — Mute if already active on LAN)</option>
+                <option value="none">Standard RFC (No disambiguation)</option>
+              </select>
+              <div class="help-text">Protects against Finder duplicate split-brain when multiple Meshbeacons run on the same network.</div>
+            </div>
           </div>
         </details>
 
@@ -671,6 +693,11 @@
           }
         }
 
+        if (data.collision_policy) {
+          const colElem = document.getElementById('cfg-collision-policy');
+          if (colElem) colElem.value = data.collision_policy;
+        }
+
         // Render Services Table
         const tbody = document.getElementById('services-tbody');
         tbody.innerHTML = '';
@@ -678,11 +705,18 @@
           tbody.innerHTML = '<tr><td colspan="4" style="color: var(--text-muted); text-align: center; padding: 1.5rem;">No services active. Configure upstream above.</td></tr>';
         } else {
           data.services.forEach(s => {
+            if (s.name === 'samba') {
+              const sambaChk = document.getElementById('svc-samba');
+              if (sambaChk) sambaChk.checked = true;
+              const directChk = document.getElementById('cfg-samba-direct');
+              if (directChk && s.discovery && s.discovery.direct) directChk.checked = true;
+            }
             const tr = document.createElement('tr');
-            const disc = s.discovery ? (s.discovery.type + (s.discovery.port ? ' :' + s.discovery.port : '')) : 'mDNS';
+            const portStr = (s.discovery && s.discovery.direct && s.local_port === 0) ? '<span style="color: #38bdf8;">Direct</span>' : (':' + s.local_port);
+            const disc = s.discovery ? (s.discovery.type + (s.discovery.direct ? ' (Direct)' : (s.discovery.port ? ' :' + s.discovery.port : ''))) : 'mDNS';
             tr.innerHTML = `
               <td><span class="status-dot dot-green"></span><strong>${s.name}</strong></td>
-              <td>:${s.local_port}</td>
+              <td>${portStr}</td>
               <td style="color: var(--text-muted); font-family: monospace;">${s.upstream_url}</td>
               <td><span class="badge" style="background: rgba(255,255,255,0.06); font-size: 0.75rem;">${disc}</span></td>
             `;
@@ -770,11 +804,12 @@
         });
       }
       if (document.getElementById('svc-samba').checked) {
+        const directSamba = document.getElementById('cfg-samba-direct') ? document.getElementById('cfg-samba-direct').checked : false;
         services.push({
           name: "samba",
-          local_port: 445,
+          local_port: directSamba ? 0 : 445,
           upstream_url: "tcp://" + cleanHost.replace(/^https?:\/\//, '') + ":445",
-          discovery: { type: "samba", server_name: "Media Server" }
+          discovery: { type: "samba", server_name: "Media Server", direct: directSamba }
         });
       }
 
@@ -784,11 +819,14 @@
       const ttl = document.getElementById('cfg-ttl').value;
       const advAddr = document.getElementById('cfg-advertise').value.trim() || 'auto';
       const adminPort = parseInt(document.getElementById('cfg-admin-port').value, 10) || 7350;
+      const colElem = document.getElementById('cfg-collision-policy');
+      const collisionPolicy = colElem ? colElem.value : 'auto_rename';
 
       const payload = {
         schema_version: 1,
         admin_port: adminPort,
         advertise_addr: advAddr,
+        collision_policy: collisionPolicy,
         cache: {
           enabled: ramSize !== 'off' || (diskDir !== '' && diskSize !== 'off'),
           ram_size: ramSize,

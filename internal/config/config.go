@@ -17,7 +17,8 @@ type DiscoveryConfig struct {
 	ServerID   string            `json:"server_id"`   // Unique server identifier (auto-detected for Jellyfin/Plex)
 	Service    string            `json:"service"`     // mDNS service type, e.g. "_immich._tcp", "_ipp._tcp", "_hap._tcp"
 	TXT        map[string]string `json:"txt"`         // Custom mDNS TXT record key-value pairs
-	Direct     bool              `json:"direct"`      // If true, advertise upstream host/IP directly (discovery-only / direct mode)
+	Direct          bool              `json:"direct"`           // If true, advertise upstream host/IP directly (discovery-only / direct mode)
+	CollisionPolicy string            `json:"collision_policy"` // "auto_rename" (Mode A default), "suppress", "none"
 }
 
 // NormalizeServiceType formats the service identifier into RFC 6763 DNS-SD format (e.g. "_immich._tcp").
@@ -73,10 +74,11 @@ type CacheConfig struct {
 type Config struct {
 	SchemaVersion int             `json:"schema_version,omitempty"` // Configuration schema version (e.g. 1)
 	AdminPort     int             `json:"admin_port,omitempty"`     // Web dashboard & setup port (default: 7350)
-	AutoUpdate    bool            `json:"auto_update,omitempty"`    // Enable daily automatic updates on standalone installs
-	AdvertiseAddr string          `json:"advertise_addr"`           // e.g. "http://192.168.1.100" or "auto"
-	Cache         CacheConfig     `json:"cache"`
-	Services      []ServiceConfig `json:"services"`
+	AutoUpdate      bool            `json:"auto_update,omitempty"`      // Enable daily automatic updates on standalone installs
+	AdvertiseAddr   string          `json:"advertise_addr"`             // e.g. "http://192.168.1.100" or "auto"
+	CollisionPolicy string          `json:"collision_policy,omitempty"` // Global discovery collision policy ("auto_rename", "suppress", "none")
+	Cache           CacheConfig     `json:"cache"`
+	Services        []ServiceConfig `json:"services"`
 }
 
 // IsPlaceholderURL checks if a target upstream URL is unconfigured template filler.
@@ -221,12 +223,14 @@ func SaveConfig(filePath string, cfg *Config) error {
 	return nil
 }
 
-// LoadConfig reads configuration from a JSON file path.
+// LoadConfig reads configuration from a JSON file path and expands environment variables.
 func LoadConfig(filePath string) (*Config, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read config file: %w", err)
 	}
+
+	expanded := os.ExpandEnv(string(data))
 
 	var cfg Config
 	// Defaults
@@ -235,8 +239,9 @@ func LoadConfig(filePath string) (*Config, error) {
 	cfg.Cache.Enabled = true
 	cfg.Cache.RAMSize = "auto"
 	cfg.Cache.TTL = "auto"
+	cfg.CollisionPolicy = "auto_rename"
 
-	if err := json.Unmarshal(data, &cfg); err != nil {
+	if err := json.Unmarshal([]byte(expanded), &cfg); err != nil {
 		return nil, fmt.Errorf("invalid json in config file: %w", err)
 	}
 
@@ -245,6 +250,9 @@ func LoadConfig(filePath string) (*Config, error) {
 	}
 	if cfg.AdminPort == 0 {
 		cfg.AdminPort = 7350
+	}
+	if cfg.CollisionPolicy == "" {
+		cfg.CollisionPolicy = "auto_rename"
 	}
 	if cfg.Cache.RAMSize == "" {
 		cfg.Cache.RAMSize = "auto"
