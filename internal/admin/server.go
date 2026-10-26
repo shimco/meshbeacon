@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -66,9 +67,31 @@ func NewServer(cfg *config.Config, configPath, version string, c *cache.DualTier
 		port = 7350
 	}
 
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.RLock()
+		basePath := s.cfg.BasePath
+		s.mu.RUnlock()
+
+		if p := r.Header.Get("X-Forwarded-Prefix"); p != "" {
+			basePath = p
+		}
+
+		if basePath != "" {
+			prefix := "/" + strings.Trim(basePath, "/")
+			if strings.HasPrefix(r.URL.Path, prefix) {
+				r.URL.Path = strings.TrimPrefix(r.URL.Path, prefix)
+				if r.URL.Path == "" {
+					r.URL.Path = "/"
+				}
+			}
+		}
+
+		mux.ServeHTTP(w, r)
+	})
+
 	s.httpServer = &http.Server{
 		Addr:              fmt.Sprintf(":%d", port),
-		Handler:           mux,
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
@@ -115,8 +138,26 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	s.mu.RLock()
+	basePath := s.cfg.BasePath
+	s.mu.RUnlock()
+	if p := r.Header.Get("X-Forwarded-Prefix"); p != "" {
+		basePath = p
+	}
+	if basePath != "" {
+		basePath = "/" + strings.Trim(basePath, "/")
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
+
+	if basePath != "" {
+		injected := fmt.Sprintf("<script>window.__MB_BASE_PATH__ = %q;</script>\n</head>", basePath)
+		replaced := bytes.Replace(indexHTML, []byte("</head>"), []byte(injected), 1)
+		_, _ = w.Write(replaced)
+		return
+	}
+
 	_, _ = w.Write(indexHTML)
 }
 
@@ -126,15 +167,16 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 }
 
 type StatusResponse struct {
-	Version       string                 `json:"version"`
-	Mode          string                 `json:"mode"`
-	Configured    bool                   `json:"configured"`
+	Version         string                 `json:"version"`
+	Mode            string                 `json:"mode"`
+	Configured      bool                   `json:"configured"`
 	AdvertiseAddr   string                 `json:"advertise_addr"`
 	CollisionPolicy string                 `json:"collision_policy,omitempty"`
+	BasePath        string                 `json:"base_path,omitempty"`
 	Uptime          string                 `json:"uptime"`
-	Services      []config.ServiceConfig `json:"services"`
-	Cache         map[string]interface{} `json:"cache"`
-	AutoResolved  map[string]string      `json:"auto_resolved"`
+	Services        []config.ServiceConfig `json:"services"`
+	Cache           map[string]interface{} `json:"cache"`
+	AutoResolved    map[string]string      `json:"auto_resolved"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -197,6 +239,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Configured:      configured,
 		AdvertiseAddr:   cfg.AdvertiseAddr,
 		CollisionPolicy: cfg.CollisionPolicy,
+		BasePath:        cfg.BasePath,
 		Uptime:          uptimeStr,
 		Services:        cfg.Services,
 		Cache:           cacheInfo,
@@ -405,7 +448,11 @@ func (s *Server) checkOrigin(w http.ResponseWriter, r *http.Request) bool {
 		http.Error(w, `{"error":"invalid origin"}`, http.StatusForbidden)
 		return false
 	}
-	if strings.EqualFold(u.Host, r.Host) {
+	reqHost := r.Host
+	if xfh := r.Header.Get("X-Forwarded-Host"); xfh != "" {
+		reqHost = xfh
+	}
+	if strings.EqualFold(u.Host, reqHost) || strings.EqualFold(u.Host, r.Host) {
 		return true
 	}
 	h := u.Hostname()

@@ -322,7 +322,7 @@
 <body>
 
   <header>
-    <a href="/" class="brand">
+    <a href="./" class="brand">
       <div class="brand-icon-wrap">
         <svg viewBox="0 0 100 100" fill="none">
           <path d="M 42 22 A 16 16 0 0 0 42 38 M 35 15 A 25 25 0 0 0 35 45" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" />
@@ -469,6 +469,12 @@
               </select>
               <div class="help-text">Protects against Finder duplicate split-brain when multiple Meshbeacons run on the same network.</div>
             </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label for="cfg-base-path">Reverse Proxy Subpath (Base Path)</label>
+              <input type="text" id="cfg-base-path" class="input-text" placeholder="e.g. /meshbeacon (leave blank for root)">
+              <div class="help-text">Optional URL subpath if running behind Traefik, Caddy, or Nginx SSL proxy (e.g. /meshbeacon). Leave empty if serving directly from port 7350 or root domain.</div>
+            </div>
           </div>
         </details>
 
@@ -581,6 +587,17 @@
     let logPaused = false;
     let cachedConfig = null;
 
+    function apiUrl(path) {
+      let base = (typeof window.__MB_BASE_PATH__ === 'string') ? window.__MB_BASE_PATH__ : '';
+      if (!base) {
+        const p = window.location.pathname.replace(/\/+$/, '');
+        if (p && p !== '/' && !p.startsWith('/api')) {
+          base = p;
+        }
+      }
+      return base.replace(/\/+$/, '') + path;
+    }
+
     function toggleConfigForm(forceShow) {
       const card = document.getElementById('config-card');
       const cancelBtn = document.getElementById('btn-cancel-config');
@@ -595,7 +612,7 @@
     async function purgeCache() {
       if (!confirm('Clear all in-memory and persistent disk cached artwork?')) return;
       try {
-        const res = await fetch('/api/cache/clear', { method: 'POST' });
+        const res = await fetch(apiUrl('/api/cache/clear'), { method: 'POST' });
         const data = await res.json();
         alert(data.message || 'Cache cleared');
         loadStatus();
@@ -611,7 +628,7 @@
 
     async function clearLogs() {
       try {
-        await fetch('/api/logs', { method: 'POST' });
+        await fetch(apiUrl('/api/logs'), { method: 'POST' });
         document.getElementById('log-terminal').textContent = '';
       } catch (err) {
         console.error('Failed to clear logs:', err);
@@ -621,7 +638,7 @@
     async function fetchLogs() {
       if (logPaused) return;
       try {
-        const res = await fetch('/api/logs');
+        const res = await fetch(apiUrl('/api/logs'));
         const data = await res.json();
         const term = document.getElementById('log-terminal');
         if (data.logs && data.logs.length > 0) {
@@ -639,7 +656,7 @@
 
     async function loadStatus() {
       try {
-        const res = await fetch('/api/status');
+        const res = await fetch(apiUrl('/api/status'));
         const data = await res.json();
 
         // Update Version & Badges
@@ -696,6 +713,11 @@
         if (data.collision_policy) {
           const colElem = document.getElementById('cfg-collision-policy');
           if (colElem) colElem.value = data.collision_policy;
+        }
+
+        if (data.base_path !== undefined) {
+          const bpElem = document.getElementById('cfg-base-path');
+          if (bpElem) bpElem.value = data.base_path;
         }
 
         // Render Services Table
@@ -821,12 +843,15 @@
       const adminPort = parseInt(document.getElementById('cfg-admin-port').value, 10) || 7350;
       const colElem = document.getElementById('cfg-collision-policy');
       const collisionPolicy = colElem ? colElem.value : 'auto_rename';
+      const bpElem = document.getElementById('cfg-base-path');
+      const basePath = bpElem ? bpElem.value.trim() : '';
 
       const payload = {
         schema_version: 1,
         admin_port: adminPort,
         advertise_addr: advAddr,
         collision_policy: collisionPolicy,
+        base_path: basePath,
         cache: {
           enabled: ramSize !== 'off' || (diskDir !== '' && diskSize !== 'off'),
           ram_size: ramSize,
@@ -838,7 +863,7 @@
       };
 
       try {
-        const res = await fetch('/api/config', {
+        const res = await fetch(apiUrl('/api/config'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -861,7 +886,7 @@
       const msg = document.getElementById('update-msg');
       msg.textContent = 'Checking GitHub releases...';
       try {
-        const res = await fetch('/api/update');
+        const res = await fetch(apiUrl('/api/update'));
         const data = await res.json();
         if (data.is_newer) {
           msg.innerHTML = `<span style="color: #34d399; font-weight: 600;">Update ${data.latest} available!</span> <button class="btn" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-left: 0.5rem;" onclick="triggerUpdate()">Apply</button>`;
@@ -878,7 +903,7 @@
       const msg = document.getElementById('update-msg');
       msg.textContent = 'Applying update...';
       try {
-        const res = await fetch('/api/update', { method: 'POST' });
+        const res = await fetch(apiUrl('/api/update'), { method: 'POST' });
         const data = await res.json();
         if (data.success) {
           msg.innerHTML = '<span style="color: #34d399;">Update successful! Reloading...</span>';

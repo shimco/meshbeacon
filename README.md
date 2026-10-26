@@ -81,6 +81,7 @@ Meshbeacon bridges your remote server into your local home Wi-Fi:
 | **Audiobookshelf** | mDNS (`_audiobookshelf._tcp`) | Auto-discovery for mobile apps; streams audiobooks; caches book cover art |
 | **Navidrome** | mDNS (`_subsonic._tcp`) | Subsonic client discovery; streams music; caches album covers |
 | **Kavita / Mealie** | mDNS (`_http._tcp`) | Local discovery for reading & recipe apps; caches covers and recipe images |
+| **Samba / NAS Shares** | mDNS (`_smb._tcp` & `_device-info._tcp`) | Auto-populates remote NAS shares in macOS Finder and Windows Explorer; optional direct wire-speed WireGuard mode |
 | **Generic HTTP** | Custom mDNS DNS-SD record | Reverse-proxy any homelab dashboard, printer (IPP), or companion app (Jellyseerr/Overseerr) |
 
 ---
@@ -166,9 +167,12 @@ brew services start meshbeacon
 - [x] **mDNS / DNS-SD Broadcasting:** Publishes `_jellyfin._tcp` and `_plexmediasvr._tcp` zero-conf records for Apple TV (Swiftfin), Infuse, and iOS clients.
 - [x] **Zero-Config Identity Detection:** Automatically queries upstream server endpoints (`/System/Info/Public` and `/identity`) to fetch Server IDs and names (no manual UUID configuration needed).
 - [x] **Zero-Allocation 4K Streaming:** Hardened Go reverse proxy with pooled 32KB buffers (`sync.Pool`) for high-bitrate streaming with minimal RAM usage.
+- [x] **Raw TCP Stream Forwarding:** Low-overhead TCP gateway for SMB (`:445`), SSH, or CUPS alongside standard HTTP proxying.
 - [x] **Dual-Tier Caching:** In-memory LRU cache scaled to hardware (8MB to 512MB) to eliminate SD card wear, with an optional persistent SSD/NVMe tier.
-- [x] **Extensible Service Proxy:** Stream and cache companion apps like Jellyseerr, Overseerr, Immich, Navidrome, or Audiobookshelf.
+- [x] **Extensible Service Proxy:** Stream and cache companion apps like Jellyseerr, Overseerr, Immich, Navidrome, Audiobookshelf, or Samba.
+- [x] **Airtime-Friendly mDNS & Mode A Collision Disambiguation:** Passive query-listening with Mode A auto-rename (`server_name (hostname)`) to prevent duplicate split-brain on multi-beacon networks.
 - [x] **Embedded Web Dashboard & Standby Setup:** Zero-dependency web UI on port `7350` (`http://meshbeacon.local:7350`) with first-run setup wizard and live cache metrics.
+- [x] **Traefik & Reverse Proxy Subpath Support:** Securely tunnel the WebGUI behind Traefik, Caddy, or Nginx on a subpath (e.g. `/meshbeacon`) with dynamic API routing and CSRF origin validation while preserving simultaneous direct HTTP access.
 - [x] **OpenWrt & LuCI Integration:** Auto-installing `procd` service and LuCI menu integration under **Services -> Meshbeacon** for travel routers (e.g. GL.iNet Beryl AX).
 - [x] **Safe Self-Updater & Pre-flight Testing:** Standalone binary updates with SHA-256 checksum verification, pre-flight config validation, and rollback safety net (`meshbeacon -update`).
 - [x] **Cross-Platform Static Binaries:** Pure Go (`CGO_ENABLED=0`) with zero external libc runtime dependencies (x86_64, ARM64, ARMv7, MIPS/MIPSEL for OpenWrt).

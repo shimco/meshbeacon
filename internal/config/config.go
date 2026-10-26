@@ -77,6 +77,7 @@ type Config struct {
 	AutoUpdate      bool            `json:"auto_update,omitempty"`      // Enable daily automatic updates on standalone installs
 	AdvertiseAddr   string          `json:"advertise_addr"`             // e.g. "http://192.168.1.100" or "auto"
 	CollisionPolicy string          `json:"collision_policy,omitempty"` // Global discovery collision policy ("auto_rename", "suppress", "none")
+	BasePath        string          `json:"base_path,omitempty"`        // Reverse proxy URL subpath (e.g. "/meshbeacon")
 	Cache           CacheConfig     `json:"cache"`
 	Services        []ServiceConfig `json:"services"`
 }

@@ -178,6 +178,8 @@ meshbeacon -update
   "schema_version": 1,
   "admin_port": 7350,
   "advertise_addr": "auto",
+  "collision_policy": "auto_rename",
+  "base_path": "/meshbeacon",
   "cache": {
     "enabled": true,
     "ram_size": "auto",
@@ -205,6 +207,15 @@ meshbeacon -update
       }
     },
     {
+      "name": "samba",
+      "local_port": 445,
+      "upstream_url": "tcp://media-server.your-tailnet.ts.net:445",
+      "discovery": {
+        "type": "samba",
+        "server_name": "Media Server"
+      }
+    },
+    {
       "name": "jellyseerr",
       "local_port": 5055,
       "upstream_url": "http://media-server.your-tailnet.ts.net:5055"
@@ -215,9 +226,47 @@ meshbeacon -update
 
 ### Key Settings:
 * **`advertise_addr`**: Set to `"auto"` to automatically discover and broadcast your primary LAN IP. Or specify a static IP (e.g., `"192.168.0.2"`).
+* **`collision_policy`**: Controls behavior when multiple Meshbeacons announce the same service on the same LAN:
+  - `"auto_rename"` *(default Mode A)*: Automatically appends the local host identifier (e.g. `Media Server (homeserver)`) to prevent Finder or Smart TV duplicate confusion.
+  - `"suppress"`: Silences local announcement if an active instance is already broadcasting on the network.
+  - `"none"`: Disables collision detection.
+* **`base_path`**: Optional URL subpath if running behind a reverse proxy (e.g. `"/meshbeacon"`). Meshbeacon automatically prefixes dynamic WebGUI API calls and strips prefixes on ingress, while keeping direct IP:port HTTP access working simultaneously.
+* **`services[].discovery.direct`**: For Samba/SMB (`_smb._tcp`), set to `true` to advertise upstream Tailscale/WireGuard IPs directly in DNS-SD A/SRV records. WireGuard-capable Macs and PCs connect directly at full wire speed with zero router CPU overhead.
 * **`cache.ram_size`**: `"auto"` (scales dynamically based on system RAM), `"64MB"`, or `"off"` for pure disk mode.
 * **`cache.disk_dir`**: Leave blank `""` for 100% in-memory caching (zero SD card wear). Set to an SSD/NVMe path (e.g. `"/var/cache/meshbeacon"`) for persistent storage.
 * **`cache.ttl`**: `"auto"` (30 days in RAM mode, 90 days in persistent disk mode), or explicit duration like `"180d"`.
+
+---
+
+## 🌐 Reverse Proxy & Traefik SSL Subpath Setup
+
+You can securely expose the Meshbeacon WebGUI behind Traefik, Caddy, or Nginx on an SSL subpath (e.g. `https://homeserver.your-domain.ts.net/meshbeacon`) while retaining direct HTTP access on your LAN port (e.g. `http://homeserver:7351`).
+
+### Traefik Dynamic Configuration Example (`traefik_dynamic.yml`)
+
+```yaml
+http:
+  routers:
+    meshbeacon:
+      rule: "Host(`homeserver.your-domain.ts.net`) && PathPrefix(`/meshbeacon`)"
+      entrypoints:
+        - websecure
+      service: meshbeacon
+      tls:
+        certResolver: tailscale
+
+  services:
+    meshbeacon:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:7351"
+```
+
+### How Dual-Access & Subpaths Work Under the Hood:
+1. **Dynamic URL Resolution**: Meshbeacon inspects `X-Forwarded-Prefix`, `base_path` config, and browser `window.location.pathname` to ensure frontend `fetch()` API calls automatically route to `/meshbeacon/api/...` instead of the root `/api/...`.
+2. **Built-in Prefix Stripping**: Meshbeacon's internal HTTP router transparently strips incoming subpaths (`/meshbeacon/...` -> `/...`), so you do not even need Traefik `stripprefix` middleware.
+3. **Cross-Origin & CSRF Support**: Meshbeacon validates `X-Forwarded-Host` against `Origin`, allowing safe configuration updates from your secure proxy domain.
+4. **Simultaneous Direct Access**: Accessing `http://<lan-ip>:7351` continues to function concurrently with no configuration changes required.
 
 ---
 
