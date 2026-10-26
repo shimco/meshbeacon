@@ -243,3 +243,32 @@ func TestLoadConfigEnvExpansion(t *testing.T) {
 	}
 }
 
+func TestBasePathNormalization(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"/meshbeacon", "/meshbeacon"},
+		{"meshbeacon", "/meshbeacon"},
+		{"/meshbeacon/", "/meshbeacon"},
+		{"meshbeacon/", "/meshbeacon"},
+		{"/custom/sub/path/", "/custom/sub/path"},
+		{"/", ""},
+		{"   ", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		cfg := &Config{
+			AdminPort: 7350,
+			BasePath:  tt.input,
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("Validate failed for input %q: %v", tt.input, err)
+		}
+		if cfg.BasePath != tt.expected {
+			t.Errorf("BasePath for %q: expected %q, got %q", tt.input, tt.expected, cfg.BasePath)
+		}
+	}
+}
+

@@ -95,7 +95,23 @@ func TestBasePathAndReverseProxy(t *testing.T) {
 		t.Fatalf("Expected 200 OK for X-Forwarded-Prefix, got %d", rec.Code)
 	}
 
-	// 3. Test checkOrigin with X-Forwarded-Host
+	// 3. Test exact root subpath request /meshbeacon
+	req = httptest.NewRequest("GET", "/meshbeacon", nil)
+	rec = httptest.NewRecorder()
+	srv.httpServer.Handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for exact /meshbeacon root, got %d", rec.Code)
+	}
+
+	// 4. Test boundary protection: /meshbeacon-other must not match prefix
+	req = httptest.NewRequest("GET", "/meshbeacon-other/healthz", nil)
+	rec = httptest.NewRecorder()
+	srv.httpServer.Handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("Expected 404 Not Found for false prefix /meshbeacon-other/healthz, got %d", rec.Code)
+	}
+
+	// 5. Test checkOrigin with X-Forwarded-Host
 	req = httptest.NewRequest("POST", "/api/config", nil)
 	req.Host = "127.0.0.1:7350"
 	req.Header.Set("Origin", "https://traefik.homelab.net")

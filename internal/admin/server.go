@@ -78,7 +78,7 @@ func NewServer(cfg *config.Config, configPath, version string, c *cache.DualTier
 
 		if basePath != "" {
 			prefix := "/" + strings.Trim(basePath, "/")
-			if strings.HasPrefix(r.URL.Path, prefix) {
+			if r.URL.Path == prefix || strings.HasPrefix(r.URL.Path, prefix+"/") {
 				r.URL.Path = strings.TrimPrefix(r.URL.Path, prefix)
 				if r.URL.Path == "" {
 					r.URL.Path = "/"

@@ -174,6 +174,15 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.BasePath != "" {
+		trimmed := strings.Trim(strings.TrimSpace(c.BasePath), "/")
+		if trimmed != "" {
+			c.BasePath = "/" + trimmed
+		} else {
+			c.BasePath = ""
+		}
+	}
+
 	return nil
 }
 
