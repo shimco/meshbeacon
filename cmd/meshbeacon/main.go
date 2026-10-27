@@ -28,7 +28,7 @@ import (
 	"github.com/shimco/meshbeacon/internal/updater"
 )
 
-var version = "v0.8.4"
+var version = "v0.8.5"
 
 func getEnv(key, defaultVal string) string {
 	if val := os.Getenv(key); val != "" {

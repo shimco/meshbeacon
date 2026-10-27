@@ -339,7 +339,7 @@
     </a>
     <div class="header-badges">
       <span id="mode-badge" class="badge badge-standby">Standby Mode</span>
-      <span id="version-badge" class="badge" style="background: rgba(255,255,255,0.06);">v0.8.4</span>
+      <span id="version-badge" class="badge" style="background: rgba(255,255,255,0.06);">v0.8.5</span>
     </div>
   </header>
 
@@ -660,8 +660,8 @@
         const data = await res.json();
 
         // Update Version & Badges
-        document.getElementById('version-badge').textContent = data.version || 'v0.8.4';
-        document.getElementById('sys-version').textContent = data.version || 'v0.8.4';
+        document.getElementById('version-badge').textContent = data.version || 'v0.8.5';
+        document.getElementById('sys-version').textContent = data.version || 'v0.8.5';
         document.getElementById('sys-uptime').textContent = data.uptime || '-';
 
         // Auto-resolved indicators
