@@ -49,6 +49,6 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          go build -v -ldflags="-s -w" \
+          go build -v -trimpath -ldflags="-s -w" \
             -o meshbeacon-${{ matrix.goos }}-${{ matrix.goarch }} \
             ./cmd/meshbeacon

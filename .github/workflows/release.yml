@@ -56,9 +56,13 @@ jobs:
           GOMIPS: ${{ matrix.gomips }}
           CGO_ENABLED: 0
         run: |
-          go build -v \
+          go build -v -trimpath \
             -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
             -o meshbeacon ./cmd/meshbeacon
+          if [ "${{ matrix.goarch }}" = "mipsle" ]; then
+            sudo apt-get update && sudo apt-get install -y upx-ucl
+            upx --best meshbeacon
+          fi
           tar -czf ${{ matrix.archive_name }}.tar.gz \
             meshbeacon meshbeacon.example.json LICENSE
           if [ "${{ matrix.goos }}" = "linux" ] && \

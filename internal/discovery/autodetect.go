@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -17,8 +17,10 @@ type jellyfinPublicInfo struct {
 	ServerName string `json:"ServerName"`
 }
 
-type plexMediaContainer struct {
-	MachineIdentifier string `xml:"machineIdentifier,attr"`
+type plexIdentityJSON struct {
+	MediaContainer struct {
+		MachineIdentifier string `json:"machineIdentifier"`
+	} `json:"MediaContainer"`
 }
 
 // DetectJellyfinInfo queries the unauthenticated /System/Info/Public endpoint of an upstream
@@ -61,6 +63,7 @@ func DetectPlexInfo(ctx context.Context, upstreamURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Do(req)
@@ -73,16 +76,36 @@ func DetectPlexInfo(ctx context.Context, upstreamURL string) (string, error) {
 		return "", fmt.Errorf("plex returned unexpected HTTP %d from %s", resp.StatusCode, reqURL)
 	}
 
-	var container plexMediaContainer
-	if err := xml.NewDecoder(resp.Body).Decode(&container); err != nil {
-		return "", fmt.Errorf("failed to decode Plex identity XML: %w", err)
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if err != nil {
+		return "", fmt.Errorf("failed to read Plex identity response: %w", err)
 	}
 
-	if container.MachineIdentifier == "" {
-		return "", fmt.Errorf("no machineIdentifier found in Plex /identity response")
+	// 1. Fast JSON decode (Plex supports JSON when Accept: application/json is provided)
+	var jsonResp plexIdentityJSON
+	if err := json.Unmarshal(bodyBytes, &jsonResp); err == nil && jsonResp.MediaContainer.MachineIdentifier != "" {
+		return jsonResp.MediaContainer.MachineIdentifier, nil
 	}
 
-	return container.MachineIdentifier, nil
+	// 2. Fallback: Parse XML string without encoding/xml to keep binary footprint minimal
+	if id := extractMachineIDFromXML(string(bodyBytes)); id != "" {
+		return id, nil
+	}
+
+	return "", fmt.Errorf("no machineIdentifier found in Plex /identity response")
+}
+
+func extractMachineIDFromXML(body string) string {
+	idx := strings.Index(body, `machineIdentifier="`)
+	if idx == -1 {
+		return ""
+	}
+	sub := body[idx+len(`machineIdentifier="`):]
+	end := strings.IndexByte(sub, '"')
+	if end == -1 {
+		return ""
+	}
+	return sub[:end]
 }
 
 // FallbackServerID generates a stable, deterministic UUID-like hex ID based on the upstream URL

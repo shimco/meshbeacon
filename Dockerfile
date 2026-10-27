@@ -17,7 +17,7 @@ COPY . .
 # Build statically linked binary for target architecture
 RUN if [ -n "$TARGETARCH" ]; then export GOARCH="$TARGETARCH"; fi && \
     if [ "$TARGETARCH" = "arm" ] && [ -n "$TARGETVARIANT" ]; then export GOARM="${TARGETVARIANT#v}"; fi && \
-    CGO_ENABLED=0 GOOS="${TARGETOS:-linux}" go build -ldflags="-w -s" -o /meshbeacon ./cmd/meshbeacon
+    CGO_ENABLED=0 GOOS="${TARGETOS:-linux}" go build -trimpath -ldflags="-w -s" -o /meshbeacon ./cmd/meshbeacon
 
 # Minimal runtime image
 FROM alpine:3.20
