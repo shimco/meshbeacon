@@ -77,7 +77,11 @@ func (d *MagicDNSDialer) DialContext(ctx context.Context, network, addr string) 
 	}
 
 	magicHost, _, _ := net.SplitHostPort(d.magicDNS)
-	if magicHost != "" && strings.HasPrefix(dnsErr.Server, magicHost) {
+	dnsServerHost, _, splitServerErr := net.SplitHostPort(dnsErr.Server)
+	if splitServerErr != nil {
+		dnsServerHost = dnsErr.Server
+	}
+	if magicHost != "" && dnsServerHost == magicHost {
 		return nil, err
 	}
 
