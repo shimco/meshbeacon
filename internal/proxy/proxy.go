@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/shimco/meshbeacon/internal/cache"
+	"github.com/shimco/meshbeacon/internal/netutil"
 )
 
 // bufferPool implements httputil.BufferPool using sync.Pool for zero-allocation streaming.
@@ -68,11 +69,8 @@ func NewStreamProxy(name, targetURL string, assetCache *cache.DualTierCache, tel
 
 	// Hardened HTTP Transport with explicit timeouts to prevent connection hangs
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   5 * time.Second,
-			KeepAlive: 15 * time.Second,
-		}).DialContext,
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           netutil.DialContextFunc(5*time.Second, 15*time.Second),
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   20,
@@ -181,9 +179,7 @@ func (sp *StreamProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Ping checks if the upstream target is responding.
 func (sp *StreamProxy) Ping(ctx context.Context) error {
-	client := &http.Client{
-		Timeout: 3 * time.Second,
-	}
+	client := netutil.NewHTTPClient(3 * time.Second)
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, sp.target.String(), nil)
 	if err != nil {
 		return err

@@ -8,6 +8,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/shimco/meshbeacon/internal/netutil"
 )
 
 // TCPProxy forwards raw TCP streams (e.g. SMB port 445, SSH, raw sockets) to an upstream target.
@@ -59,7 +61,7 @@ func (tp *TCPProxy) Start(ctx context.Context) error {
 func (tp *TCPProxy) handleConn(src net.Conn) {
 	defer src.Close()
 
-	dst, err := net.DialTimeout("tcp", tp.targetAddr, 5*time.Second)
+	dst, err := netutil.DialTimeout("tcp", tp.targetAddr, 5*time.Second)
 	if err != nil {
 		log.Printf("[TCP Proxy Error][%s] failed to connect to upstream %s: %v", tp.name, tp.targetAddr, err)
 		return

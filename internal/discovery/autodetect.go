@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/shimco/meshbeacon/internal/netutil"
 )
 
 type jellyfinPublicInfo struct {
@@ -34,7 +36,7 @@ func DetectJellyfinInfo(ctx context.Context, upstreamURL string) (string, string
 		return "", "", err
 	}
 
-	client := &http.Client{Timeout: 3 * time.Second}
+	client := netutil.NewHTTPClient(3 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to query Jellyfin info at %s: %w", reqURL, err)
@@ -65,7 +67,7 @@ func DetectPlexInfo(ctx context.Context, upstreamURL string) (string, error) {
 	}
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: 3 * time.Second}
+	client := netutil.NewHTTPClient(3 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to query Plex identity at %s: %w", reqURL, err)

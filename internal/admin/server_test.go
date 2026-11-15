@@ -21,7 +21,7 @@ func TestAdminEndpoints(t *testing.T) {
 
 	ring := logring.New(10)
 	_, _ = ring.Write([]byte("test log entry\n"))
-	srv := NewServer(cfg, "", "v0.8.5", nil, nil, ring, nil)
+	srv := NewServer(cfg, "", "v0.8.6", nil, nil, ring, nil)
 
 	// 1. Test Index
 	rec := httptest.NewRecorder()
@@ -76,7 +76,7 @@ func TestBasePathAndReverseProxy(t *testing.T) {
 		BasePath:      "/meshbeacon",
 	}
 
-	srv := NewServer(cfg, "", "v0.8.5", nil, nil, nil, nil)
+	srv := NewServer(cfg, "", "v0.8.6", nil, nil, nil, nil)
 
 	// 1. Test subpath prefix stripping through HTTP handler
 	req := httptest.NewRequest("GET", "/meshbeacon/healthz", nil)
